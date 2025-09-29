@@ -1,0 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Nata+Sans:wght@100..900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Rubik:ital,wght@0,300..900;1,300..900&display=swap');@import "tailwindcss";
+
+@theme{
+  --font-rubik:"Rubik", sans-serif;
+  --font-poppins:"Poppins", sans-serif;
+  --font-nata-sans:"Nata Sans", sans-serif;
+  --font-inter:"Inter", sans-serif;
+  --color-theme_color:#14805E;
+  --color-theme_color2:#14805E;
+  --color-icon_color:#D69C46;
+  --color-theme_gray:#303232;
+  --color-box_bg:#222424;
+}
+
+
+/* ----------------custom-scroll-bar------------------- */
+/* width */
+::-webkit-scrollbar {
+    width: 5px;
+}
+/* Track */
+::-webkit-scrollbar-track {
+    background: #141515;
+}
+/* Handle */
+::-webkit-scrollbar-thumb {
+    background: #2A2A2A;
+    border-radius: 5px;
+}
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+.hidescrollbar{
+    overflow-x: hidden;
+}
+/* --------------------hide-scrollbar-------------------------- */
+/* add the code bellow */ 
+@layer utilities {
+      /* Hide scrollbar for Chrome, Safari and Opera */
+      .no-scrollbar::-webkit-scrollbar {
+          display: none;
+      }
+     /* Hide scrollbar for IE, Edge and Firefox */
+      .no-scrollbar {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
+    }
+  }

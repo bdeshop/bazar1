@@ -1,0 +1,621 @@
+import React, { useState, useEffect, useRef } from "react";
+import { FaBars, FaChevronDown, FaChevronRight, FaGift, FaCrown, FaUserFriends, FaHandshake, FaTimes } from "react-icons/fa";
+import { NavLink } from "react-router-dom";
+import { MdSupportAgent } from "react-icons/md";
+import { IoClose } from "react-icons/io5";
+import {
+  FiBell,
+  FiUser,
+  FiLock,
+  FiCheckCircle,
+  FiFileText,
+  FiTrendingUp,
+  FiGift,
+  FiUsers,
+  FiLogOut,
+} from "react-icons/fi";
+import { MdSportsSoccer } from "react-icons/md";
+import { FiEye, FiEyeOff } from 'react-icons/fi';
+
+export const Header = ({ sidebarOpen, setSidebarOpen }) => {
+  const [activeMenu, setActiveMenu] = useState(null);
+  const [activeSubMenu, setActiveSubMenu] = useState(null);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState(null);
+const isLoggedIn = true; // Example (replace this with real logic)
+  const menuItems = [
+    { id: "notifications", label: "Notifications", icon: <FiBell />, path: "/member/inbox/notification" },
+    { id: "personal-info", label: "Personal info", icon: <FiUser />, path: "/member/profile/info" },
+    { id: "login-security", label: "Login & Security", icon: <FiLock />, path: "/member/profile/account" },
+    { id: "verification", label: "Verification", icon: <FiCheckCircle />, path: "/member/profile/verify" },
+    { id: "transactions", label: "Transaction records", icon: <FiFileText />, path: "/member/transaction-records" },
+    { id: "betting-records", label: "Betting records", icon: <MdSportsSoccer />, path: "/member/betting-records/settled" },
+    { id: "turnover", label: "Turnover", icon: <FiTrendingUp />, path: "/member/turnover/uncomplete" },
+    { id: "vip", label: "My VIP", icon: <FiGift />, path: "/member/vip-info" },
+    { id: "referral", label: "My referral", icon: <FiUsers />, path: "/referral-program/details" },
+  ];
+
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setProfileDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const mainMenuItems = [
+    { 
+      title: "Exclusive", 
+      icon: "https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/inactive/icon-slot.png?v=1754999737902&source=drccdnsrc",
+      subItems: []
+    },
+    { 
+      title: "Sports", 
+      icon: "https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/inactive/icon-slot.png?v=1754999737902&source=drccdnsrc",
+      subItems: ["Live Sports", "Upcoming Events", "Virtual Sports"]
+    },
+    { 
+      title: "Casino", 
+      icon: "https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/inactive/icon-casino.png?v=1754999737902&source=drccdnsrc",
+      subItems: ["Live Casino", "Popular Games", "New Releases"]
+    },
+    { 
+      title: "Slots", 
+      icon: "https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/inactive/icon-slot.png?v=1754999737902&source=drccdnsrc",
+      subItems: ["Featured Slots", "Jackpot Games", "Classic Slots"]
+    },
+    { 
+      title: "Table", 
+      icon: "https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/inactive/icon-slot.png?v=1754999737902&source=drccdnsrc",
+      subItems: ["Blackjack", "Roulette", "Baccarat", "Poker"]
+    },
+    { 
+      title: "Fishing", 
+      icon: "https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/inactive/icon-slot.png?v=1754999737902&source=drccdnsrc",
+      subItems: ["Ocean King", "Fishing War", "Golden Toad"]
+    },
+    { 
+      title: "Crash", 
+      icon: "https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/inactive/icon-slot.png?v=1754999737902&source=drccdnsrc",
+      subItems: ["Aviator", "Spaceman", "JetX"]
+    },
+    { 
+      title: "Arcade", 
+      icon: "https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/inactive/icon-slot.png?v=1754999737902&source=drccdnsrc",
+      subItems: ["Plinko", "Dice", "Mines"]
+    },
+    { 
+      title: "Lottery", 
+      icon: "https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/inactive/icon-slot.png?v=1754999737902&source=drccdnsrc",
+      subItems: ["Daily Lottery", "Weekly Draw", "Instant Win"]
+    },
+  ];
+
+  const secondaryMenuItems = [
+    { 
+      title: "Promotions", 
+      icon: <FaGift className="w-5 h-5 min-w-[20px]" />,
+      subItems: ["Welcome Bonus", "Reload Bonus", "Cashback"]
+    },
+    { 
+      title: "VIP Club", 
+      icon: <FaCrown className="w-5 h-5 min-w-[20px]" />,
+      subItems: ["VIP Levels", "Exclusive Rewards", "Personal Manager"]
+    },
+    { 
+      title: "Referral program", 
+      icon: <FaUserFriends className="w-5 h-5 min-w-[20px]" />,
+      subItems: ["Invite Friends", "Earn Commission", "Bonus Terms"]
+    },
+    { 
+      title: "Affiliate", 
+      icon: <FaHandshake className="w-5 h-5 min-w-[20px]" />,
+      subItems: ["Join Program", "Marketing Tools", "Commission Rates"]
+    },
+  ];
+
+  const toggleMenu = (title) => {
+    if (activeMenu === title) {
+      setActiveMenu(null);
+      setActiveSubMenu(null);
+    } else {
+      setActiveMenu(title);
+      setActiveSubMenu(null);
+    }
+  };
+
+  const toggleSubMenu = (subItem) => {
+    if (activeSubMenu === subItem) {
+      setActiveSubMenu(null);
+    } else {
+      setActiveSubMenu(subItem);
+    }
+  };
+
+  // Profile dropdown tabs and content
+  const profileTabs = [
+    { id: "Personal info", label: "Personal info" },
+    { id: "Notifications", label: "Notifications" }
+  ];
+ const [showBalance, setShowBalance] = useState(false);
+  const [balanceData, setBalanceData] = useState({
+    vip: '1,234.56',
+    usdt: '789.12'
+  });
+
+  const toggleBalanceVisibility = () => {
+    setShowBalance(!showBalance);
+  };
+  const renderTabContent = () => {
+    switch(activeTab) {
+      case "Personal info":
+        return (
+          <div className="p-4">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold mb-2">Personal info</h2>
+              <div className="bg-[#222] rounded-lg p-4">
+                <div className="flex justify-between items-center py-2 border-b border-[#333]">
+                  <span className="text-sm text-gray-300">Username</span>
+                  <div className="flex items-center">
+                    <span className="text-sm mr-2">abundled</span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-[#333]">
+                  <span className="text-sm text-gray-300">Full legal name</span>
+                  <button className="text-theme_color text-sm">Manage</button>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-[#333]">
+                  <span className="text-sm text-gray-300">Date of birth</span>
+                  <button className="text-theme_color text-sm">Manage</button>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-[#333]">
+                  <span className="text-sm text-gray-300">Phone</span>
+                  <span className="text-sm">+880 1802365208</span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-sm text-gray-300">Email</span>
+                  <button className="text-theme_color text-sm">Manage</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      case "Notifications":
+        return (
+          <div className="p-4">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold mb-2">Notifications</h2>
+              <div className="bg-[#222] rounded-lg p-4">
+                <div className="mb-3">
+                  <h3 className="text-md font-medium mb-2">Personal info</h3>
+                  <ul className="space-y-2 text-sm">
+                    <li className="flex items-center hover:bg-[#2a2a2a] p-2 rounded cursor-pointer">
+                      <span>Login & Security</span>
+                    </li>
+                    <li className="flex items-center hover:bg-[#2a2a2a] p-2 rounded cursor-pointer">
+                      <span>Verification</span>
+                    </li>
+                    <li className="flex items-center hover:bg-[#2a2a2a] p-2 rounded cursor-pointer">
+                      <span>Transaction records</span>
+                    </li>
+                    <li className="flex items-center hover:bg-[#2a2a2a] p-2 rounded cursor-pointer">
+                      <span>Betting records</span>
+                    </li>
+                    <li className="flex items-center hover:bg-[#2a2a2a] p-2 rounded cursor-pointer">
+                      <span>Turnover</span>
+                    </li>
+                    <li className="flex items-center hover:bg-[#2a2a2a] p-2 rounded cursor-pointer">
+                      <span>My VIP</span>
+                    </li>
+                    <li className="flex items-center hover:bg-[#2a2a2a] p-2 rounded cursor-pointer">
+                      <span>My referral</span>
+                    </li>
+                  </ul>
+                </div>
+                
+                <div className="mt-6 pt-4 border-t border-[#333]">
+                  <button className="w-full py-2 text-center text-sm bg-[#333] hover:bg-[#3a3a3a] rounded">
+                    Log out
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <>
+      <header className="flex justify-between items-center p-3 bg-[#1a1a1a] text-white border-b border-[#333] relative z-[10000]">
+        {/* Left side - Menu button and Logo */}
+        <div className="flex items-center space-x-4 md:space-x-7">
+          {/* Menu button - visible on all screens */}
+          <button 
+            onClick={() => setSidebarOpen(!sidebarOpen)} 
+            className="text-icon_color md:flex hidden p-3 cursor-pointer bg-[#303232] rounded-[2px] hover:bg-[#333]"
+          >
+            {sidebarOpen ? <FaBars size={18} /> : <FaBars size={18} />}
+          </button>
+
+          {/* Logo */}
+          <NavLink to="/">
+            <img
+            src="https://img.b112j.com/bj/h5/assets/v3/images/logo.png?v=1754999737902&source=drccdnsrc"
+            alt="Logo"
+            className="w-10"
+          />
+          </NavLink>
+          <img className="w-[30px]" src="https://img.b112j.com/bj/h5/assets/v3/images/sponsor/afc-bournemouth.png?v=1754999737902&source=drccdnsrc" alt="" />
+          <button className="md:flex hidden  items-center space-x-2  text-[13px] font-[400] text-gray-400 hover:text-yellow-400">
+            <img 
+              src="https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/inactive/icon-slot.png?v=1754999737902&source=drccdnsrc" 
+              alt="Slots" 
+              className="h-5 w-5"
+            />
+            <span>Slots</span>
+          </button>
+          <button className="md:flex hidden  items-center space-x-2 text-gray-400 text-[13px] font-[400] hover:text-yellow-400">
+            <img 
+              src="https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/inactive/icon-casino.png?v=1754999737902&source=drccdnsrc" 
+              alt="Casino" 
+              className="h-5 w-5"
+            />
+            <span>Casino</span>
+          </button>
+          
+          {/* Profile button with dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button 
+              onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+              className="md:flex hidden cursor-pointer items-center space-x-2 text-gray-400 text-[13px] font-[400] hover:text-yellow-400"
+            >
+              <img 
+                src="https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/active/icon-profile.png?v=1755600713311&source=drccdnsrc" 
+                alt="Profile" 
+                className="h-5 w-5"
+              />
+              <span>Profile</span>
+            </button>
+            
+            {/* Profile Dropdown */}
+            {profileDropdownOpen && (
+              <div className="absolute top-[170%] left-0 mt-2 w-80 bg-[#111] rounded-b-[3px] shadow-xl z-50 text-white">
+      {/* Profile Header */}
+      <div className="flex items-center gap-3 p-4 border-b border-[#333]">
+        <div className=" rounded-full bg-gray-600 flex items-center justify-center text-xl font-bold">
+          {/* Avatar */}
+          <img src="https://img.b112j.com/bj/h5/assets/v3/images/member-menu/member-avatar.png?v=1755600713311&source=drccdnsrc" className="w-[40px]" alt="" />
+        </div>
+        <div>
+          <div className="text-xs text-gray-400">Full legal name</div>
+          <div className="font-[500] text-sm">Username: abusaiid</div>
+          <div className="text-xs text-gray-500 mt-1">
+            Sign up date : 2025-08-23
+          </div>
+        </div>
+      </div>
+
+      {/* Menu List */}
+      <div className="flex flex-col py-3">
+        {menuItems.map((item) => (
+          <NavLink
+            key={item.id}
+            to={item.path}
+            className={`flex items-center gap-3 px-4 py-3 text-sm transition ${
+              activeTab === item.id
+                ? "bg-[#222] text-white"
+                : "text-gray-300 hover:bg-[#1a1a1a] hover:text-white"
+            }`}
+            onClick={() => {
+              setActiveTab(item.id);
+              setProfileDropdownOpen(false);
+            }}
+          >
+            <span className="text-lg">{item.icon}</span>
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+      </div>
+
+      {/* Logout */}
+      <div className="border-t border-[#333] p-3">
+        <button className="flex items-center justify-center gap-2 w-full py-2 text-sm rounded-md border border-[#333] text-gray-300 hover:bg-[#222] hover:text-white transition">
+          <FiLogOut /> Log out
+        </button>
+      </div>
+    </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right side buttons */}
+   <div className="flex items-center space-x-3">
+  {isLoggedIn ? (
+ <div className="flex items-center rounded overflow-hidden">
+      {/* VIP Balance */}
+      <div className="flex items-center space-x-1 px-2 py-[6px] text-sm bg-[#1f1f1f] text-white">
+        <img 
+          src="https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/inactive/icon-slot.png" 
+          className="w-4 h-4" 
+          alt="VIP" 
+        />
+        <span className="min-w-[60px]">
+          {showBalance ? balanceData.vip : '********'}
+        </span>
+      </div>
+      
+      {/* USDT Balance */}
+      <div className="flex items-center space-x-1 px-2 py-[6px] text-sm bg-[#1f1f1f] text-white">
+        <img 
+          src="https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/inactive/icon-casino.png" 
+          className="w-4 h-4" 
+          alt="USDT" 
+        />
+        <span className="min-w-[60px]">
+          {showBalance ? balanceData.usdt : '********'}
+        </span>
+      </div>
+      
+      {/* Toggle Visibility Button */}
+      <button 
+        className="px-2 py-1 hover:bg-[#444] text-white transition-colors duration-200"
+        onClick={toggleBalanceVisibility}
+        aria-label={showBalance ? 'Hide balance' : 'Show balance'}
+      >
+        {showBalance ? (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                  d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+          </svg>
+        ) : (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+        )}
+      </button>
+      
+      {/* Action Buttons */}
+    <div className="flex justify-center items-center gap-2">
+  <button className="text-white text-[12px] md:text-sm px-5 py-2 border-[1px] cursor-pointer border-gray-700  rounded hover:bg-[#333] transition-all duration-200">
+        Withdrawal
+      </button>
+      <button className="bg-theme_color  text-[12px] md:text-sm  px-5 py-2 rounded-[3px] hover:bg-theme_color/80 transition-all duration-200 cursor-pointer font-medium text-white">
+        Deposit
+      </button>
+    </div>
+    </div>
+  ) : (
+    <>
+     <NavLink to="/login" className="text-white text-[12px] md:text-sm px-5 py-2 border-[1px] cursor-pointer border-gray-700  rounded hover:bg-[#333] transition-all duration-200">Log in</NavLink>
+        <NavLink to="/register" className="bg-theme_color  text-[12px] md:text-sm  px-5 py-2 rounded-[3px] hover:bg-theme_color/80 transition-all duration-200 cursor-pointer font-medium text-white">Sign up</NavLink>
+    </>
+  )}
+</div>
+
+      </header>
+
+      {/* Sidebar */}
+      <div 
+        className={`fixed top-0 left-0 min-h-full  bg-[#1a1a1a] text-white z-40 overflow-y-auto transition-all duration-300 ease-in-out ${
+          sidebarOpen ? 'w-full md:w-74  shadow-2xl' : 'w-0 -translate-x-full'
+        }`}
+        style={{ marginTop: '56px' }}
+      >
+        {/* Close button for mobile */}
+        <button 
+          onClick={() => setSidebarOpen(false)} 
+          className="md:hidden absolute top-3 right-3 cursor-pointer p-2 rounded-[3px] bg-[#303232] hover:bg-[#333]"
+        >
+          <IoClose size={18} />
+        </button>
+
+        {/* Support section */}
+        <span className={`w-full flex justify-start items-center px-4 pt-4 pb-3 transition-all duration-300 ${sidebarOpen ? 'opacity-100' : 'opacity-0 h-0 p-0 mb-0'}`}>
+          {sidebarOpen ? (
+            <span className="bg-theme_gray p-2 rounded-[3px] text-center flex justify-center items-center gap-3">
+              <MdSupportAgent className="text-white text-[20px]" />
+              <span className="text-[13px]">24/7 Live Chat</span>
+            </span>
+          ) : (
+            <span className="bg-theme_gray p-2 rounded-[3px] text-center flex justify-center items-center gap-3">
+              <MdSupportAgent className="text-white text-[20px]" />
+            </span>
+          )}
+        </span>
+        
+        {/* Promotion banner */}
+        <div className={sidebarOpen ? "p-[10px]" : "hidden"}>
+          <img className="w-full" src="https://img.b112j.com/upload/h5Announcement/image_182702.jpg" alt="" />
+        </div>
+        
+        {/* Main menu items */}
+        <div className="space-y-1 px-2 mt-[15px]">
+          {mainMenuItems.map((item, index) => (
+            <div key={index}>
+              <div 
+                className={`flex items-center p-3 rounded cursor-pointer hover:text-gray-500 text-gray-400 transition-colors duration-200 ${activeMenu === item.title ? '' : ''}`}
+                onClick={() => toggleMenu(item.title)}
+              >
+                <img src={item.icon} alt={item.title} className="w-5 h-5 min-w-[20px]" />
+                <div className={`flex items-center overflow-hidden transition-all duration-300 ${sidebarOpen ? 'ml-3 w-full' : 'w-0'}`}>
+                  <span className="text-sm flex-grow whitespace-nowrap">{item.title}</span>
+                  {item.subItems.length > 0 && (
+                    activeMenu === item.title ? <FaChevronDown className="text-xs transition-transform duration-200" /> : <FaChevronRight className="text-xs transition-transform duration-200" />
+                  )}
+                </div>
+              </div>
+              
+              {/* Submenu items */}
+              <div 
+                className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                  sidebarOpen && activeMenu === item.title && item.subItems.length > 0 ? 'max-h-96' : 'max-h-0'
+                }`}
+              >
+                {sidebarOpen && (
+                  <div className="ml-8 mt-1 mb-2 space-y-1">
+                    {item.subItems.map((subItem, subIndex) => (
+                      <div 
+                        key={subIndex} 
+                        className={`p-2 text-xs rounded cursor-pointer hover:bg-[#333] transition-colors duration-200 ${
+                          activeSubMenu === subItem ? 'bg-[#333]' : ''
+                        }`}
+                        onClick={() => toggleSubMenu(subItem)}
+                      >
+                        {subItem}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Divider */}
+        <div 
+          className={`border-t border-[#222424] my-4 mx-2 transition-all duration-300 ${
+            sidebarOpen ? 'opacity-100' : 'opacity-0'
+          }`}
+        ></div>
+
+        {/* Promotions section */}
+        <div 
+          className={`px-2 mb-2 transition-all duration-300 overflow-hidden ${
+            sidebarOpen ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
+          }`}
+        >
+          <div className="flex justify-between items-center p-2">
+            <span className="text-sm font-medium">Promotions</span>
+            <span className="text-xs text-theme_color2 underline cursor-pointer">View all</span>
+          </div>
+        </div>
+
+        {/* Secondary menu items */}
+        <div className="space-y-1 px-2">
+          {secondaryMenuItems.map((item, index) => (
+            <div key={index}>
+              <div 
+                className={`flex items-center p-3 rounded  text-gray-500 cursor-pointer hover:text-gray-600 transition-colors duration-200 ${activeMenu === item.title ? 'bg-[#333]' : ''}`}
+                onClick={() => toggleMenu(item.title)}
+              >
+                
+                {item.icon}
+                <div className={`flex items-center overflow-hidden transition-all duration-300 ${sidebarOpen ? 'ml-3 w-full' : 'w-0'}`}>
+                  <span className="text-sm flex-grow whitespace-nowrap">{item.title}</span>
+                  {item.subItems.length > 0 && (
+                    activeMenu === item.title ? <FaChevronDown className="text-xs transition-transform duration-200" /> : <FaChevronRight className="text-xs transition-transform duration-200" />
+                  )}
+                </div>
+              </div>
+              
+              {/* Submenu items */}
+              <div 
+                className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                  sidebarOpen && activeMenu === item.title && item.subItems.length > 0 ? 'max-h-96' : 'max-h-0'
+                }`}
+              >
+                {sidebarOpen && (
+                  <div className="ml-8 mt-1 mb-2 space-y-1">
+                    {item.subItems.map((subItem, subIndex) => (
+                      <div 
+                        key={subIndex} 
+                        className={`p-2 text-xs rounded cursor-pointer hover:bg-[#333] transition-colors duration-200 ${
+                          activeSubMenu === subItem ? 'bg-[#333]' : ''
+                        }`}
+                        onClick={() => toggleSubMenu(subItem)}
+                      >
+                        {subItem}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Bottom spacing */}
+        <div className="h-10"></div>
+      </div>
+
+      {/* Overlay for mobile */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-opacity-50 z-30 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        ></div>
+      )}
+
+      {/* Mobile Bottom Navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-[#1a1a1a] border-t border-[#333] z-50">
+        <div className="flex justify-around items-center py-2">
+          {/* Menu */}
+          <button 
+           onClick={() => setSidebarOpen(true)}
+            className="flex flex-col items-center cursor-pointer justify-center p-2 text-xs text-gray-400 hover:text-yellow-400 transition-colors"
+          >
+            <img 
+              src="https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/inactive/icon-menu.png?v=1754999737902&source=drccdnsrc" 
+              alt="Menu" 
+              className="h-6 w-6 mb-1"
+            />
+            <span>Menu</span>
+          </button>
+          
+          {/* Casino */}
+          <NavLink 
+            to="/casino" 
+            className="flex flex-col items-center justify-center p-2 text-xs text-gray-400 hover:text-yellow-400 transition-colors"
+          >
+            <img 
+              src="https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/inactive/icon-casino.png?v=1754999737902&source=drccdnsrc" 
+              alt="Casino" 
+              className="h-6 w-6 mb-1"
+            />
+            <span>Casino</span>
+          </NavLink>
+          
+          {/* Slots */}
+          <NavLink 
+            to="/slots" 
+            className="flex flex-col items-center justify-center p-2 text-xs text-gray-400 hover:text-yellow-400 transition-colors"
+          >
+            <img 
+              src="https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/inactive/icon-slot.png?v=1754999737902&source=drccdnsrc" 
+              alt="Slots" 
+              className="h-6 w-6 mb-1"
+            />
+            <span>Slots</span>
+          </NavLink>
+          
+          {/* Promotion */}
+          <NavLink 
+            to="/promotion" 
+            className="flex flex-col items-center justify-center p-2 text-xs text-gray-400 hover:text-yellow-400 transition-colors"
+          >
+            <img 
+              src="https://img.b112j.com/bj/h5/assets/v3/images/icon-set/menu-type/inactive/icon-promotion.png?v=1754999737902&source=drccdnsrc" 
+              alt="Promotion" 
+              className="h-6 w-6 mb-1"
+            />
+            <span>Promotion</span>
+          </NavLink>
+        </div>
+      </div>
+    </>
+  );
+};

@@ -1,0 +1,95 @@
+import React, { useState } from 'react';
+import exclusive_img from "../../../assets/exclusive.png";
+import sports_img from "../../../assets/sports.png";
+import casino_img from "../../../assets/casino.png";
+import slots_img from "../../../assets/slots.png";
+import table_img from "../../../assets/table.png";
+import fishing_img from "../../../assets/fishing.png";
+import crash_img from "../../../assets/crash.png";
+import arcade_img from "../../../assets/arcade.png";
+import lottery_img from "../../../assets/lottery.png";
+
+const exclusiveGames = [
+  { name: "Super Elements", image: "https://img.b112j.com/bj/h5/assets/images/exclusivegames/default/exclusive-super-elements.png?v=1754999737902&source=drccdnsrc" },
+  { name: "Money Wheel", image: "https://img.b112j.com/bj/h5/assets/images/exclusivegames/default/exclusive-money-wheel.png?v=1754999737902&source=drccdnsrc" },
+  { name: "Fortune Gems", image: "https://img.b112j.com/bj/h5/assets/images/exclusivegames/default/exclusive-fortune-gems.png?v=1754999737902&source=drccdnsrc" },
+  { name: "Diva's Ace", image: "https://img.b112j.com/bj/h5/assets/images/exclusivegames/default/exclusive-divas-ace.png?v=1754999737902&source=drccdnsrc" },
+  { name: "Golden Genie", image: "https://img.b112j.com/bj/h5/assets/images/exclusivegames/default/exclusive-golden-genie.png?v=1754999737902&source=drccdnsrc" },
+  { name: "The King's Ace", image: "https://img.b112j.com/bj/h5/assets/images/exclusivegames/default/exclusive-the-kings-ace.png?v=1754999737902&source=drccdnsrc" },
+];
+
+const sportsGames = [
+  // Add sports games data here
+];
+
+const casinoGames = [
+  // Add casino games data here
+];
+
+const allCategories = {
+  Exclusive: exclusiveGames,
+  Sports: sportsGames,
+  Casino: casinoGames,
+  // Add more categories here
+};
+
+const exclusiveCategories = [
+  { name: "Exclusive", image: exclusive_img },
+  { name: "Sports", image: sports_img },
+  { name: "Casino", image: casino_img },
+  { name: "Slots", image: slots_img },
+  { name: "Table", image: table_img },
+  { name: "Fishing", image: fishing_img },
+  { name: "Crash", image: crash_img },
+  { name: "Arcade", image: arcade_img },
+  { name: "Lottery", image: lottery_img },
+];
+
+const Category = () => {
+  const [activeCategory, setActiveCategory] = useState("Exclusive");
+  const gamesToDisplay = allCategories[activeCategory] || [];
+
+  return (
+    <>
+      <div className="overflow-x-auto grid grid-cols-9 gap-4 p-4 pt-[40px]">
+        {exclusiveCategories.map((category, index) => (
+            
+          <div
+            key={index}
+            className={`flex flex-col relative items-center justify-center p-3  rounded-[5px] transition-all group cursor-pointer ${
+              activeCategory === category.name
+                ? "bg-[#333333]"
+                : "bg-[#222424] hover:bg-[#333333]"
+            }`}
+            onClick={() => setActiveCategory(category.name)}
+          >
+            <img
+              src={category.image}
+              alt={category.name}
+           className="w-[55%] absolute top-[-30%] rounded-full transition-transform duration-300 ease-in-out group-hover:rotate-[360deg] hover:rotate-y"
+            />
+            <span className={`text-sm mt-4 font-[500] ${activeCategory === category.name ? "text-white" : "text-gray-400"}`}>
+              {category.name}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {gamesToDisplay.map((game, index) => (
+          <div key={index} className="relative rounded-lg overflow-hidden group cursor-pointer">
+            <img
+              src={game.image}
+              alt={game.name}
+              className="w-full h-auto transform transition-transform duration-300 ease-in-out group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <span className="text-white text-lg font-bold">{game.name}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+};
+
+export default Category;
