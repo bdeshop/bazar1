@@ -1,8 +1,15 @@
-import React, { useState, useRef, useCallback, useEffect, createContext, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
-import useEmblaCarousel from 'embla-carousel-react';
-import axios from 'axios';
-import toast from 'react-hot-toast';
+import React, {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  createContext,
+  useContext,
+} from "react";
+import { useNavigate } from "react-router-dom";
+import useEmblaCarousel from "embla-carousel-react";
+import axios from "axios";
+import toast from "react-hot-toast";
 import logo from "../../../assets/logo.png";
 
 // Create Auth Context
@@ -25,8 +32,8 @@ const AuthProvider = ({ children }) => {
   }, []);
 
   const checkAuthStatus = async () => {
-    const token = localStorage.getItem('token');
-    
+    const token = localStorage.getItem("token");
+
     if (!token) {
       setLoading(false);
       return;
@@ -36,8 +43,8 @@ const AuthProvider = ({ children }) => {
       // Validate token with backend
       const response = await fetch(`${base_url}/api/user/my-information`, {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (response.ok) {
@@ -45,23 +52,23 @@ const AuthProvider = ({ children }) => {
         setUser(data.data);
       } else {
         // Token is invalid, remove it
-        localStorage.removeItem('token');
+        localStorage.removeItem("token");
       }
     } catch (error) {
-      console.error('Auth check failed:', error);
-      localStorage.removeItem('token');
+      console.error("Auth check failed:", error);
+      localStorage.removeItem("token");
     } finally {
       setLoading(false);
     }
   };
 
   const login = (token, userData) => {
-    localStorage.setItem('token', token);
+    localStorage.setItem("token", token);
     setUser(userData);
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem("token");
     setUser(null);
   };
 
@@ -70,7 +77,7 @@ const AuthProvider = ({ children }) => {
     login,
     logout,
     checkAuthStatus,
-    loading
+    loading,
   };
 
   return (
@@ -84,7 +91,7 @@ const CategoryContent = () => {
   const base_url = import.meta.env.VITE_API_KEY_Base_URL;
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   const [categories, setCategories] = useState([]);
   const [providers, setProviders] = useState([]);
   const [exclusiveGames, setExclusiveGames] = useState([]);
@@ -97,7 +104,7 @@ const CategoryContent = () => {
   const [selectedGame, setSelectedGame] = useState(null);
   const [gameLoading, setGameLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-  
+
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: false,
     align: "start",
@@ -111,8 +118,8 @@ const CategoryContent = () => {
       setIsMobile(window.innerWidth <= 768);
     };
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   // Fetch categories on component mount
@@ -140,7 +147,7 @@ const CategoryContent = () => {
         if (response.data.data.length > 0) {
           const firstCategory = response.data.data[0];
           setActiveCategory(firstCategory);
-          if (firstCategory.name.toLowerCase() === 'exclusive') {
+          if (firstCategory.name.toLowerCase() === "exclusive") {
             fetchExclusiveGames(firstCategory.name);
           } else {
             fetchProviders(firstCategory.name);
@@ -148,7 +155,7 @@ const CategoryContent = () => {
         }
       }
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      console.error("Error fetching categories:", error);
     } finally {
       setLoading(false);
     }
@@ -156,32 +163,36 @@ const CategoryContent = () => {
 
   const fetchProviders = async (categoryName) => {
     try {
-      const response = await axios.get(`${base_url}/api/providers/${categoryName}`);
+      const response = await axios.get(
+        `${base_url}/api/providers/${categoryName}`
+      );
       if (response.data.success) {
         setProviders(response.data.data);
         setExclusiveGames([]); // Clear exclusive games when showing providers
       }
     } catch (error) {
-      console.error('Error fetching providers:', error);
+      console.error("Error fetching providers:", error);
     }
   };
 
   const fetchExclusiveGames = async (categoryName) => {
     try {
-      const response = await axios.get(`${base_url}/api/games/category/${categoryName.toLowerCase()}?limit=50`);
+      const response = await axios.get(
+        `${base_url}/api/games/category/${categoryName.toLowerCase()}?limit=50`
+      );
       if (response.data.success) {
         setExclusiveGames(response.data.data);
         setProviders([]); // Clear providers when showing exclusive games
         setGamesPage(1);
       }
     } catch (error) {
-      console.error('Error fetching exclusive games:', error);
+      console.error("Error fetching exclusive games:", error);
     }
   };
 
   const handleCategoryClick = (category) => {
     setActiveCategory(category);
-    if (category.name.toLowerCase() === 'exclusive') {
+    if (category.name.toLowerCase() === "exclusive") {
       fetchExclusiveGames(category.name);
     } else {
       fetchProviders(category.name);
@@ -190,62 +201,88 @@ const CategoryContent = () => {
 
   const handleProviderClick = (provider) => {
     if (activeCategory) {
-      navigate(`/games?category=${activeCategory.name.toLowerCase()}&provider=${provider.name.toLowerCase()}`);
+      navigate(
+        `/games?category=${activeCategory.name.toLowerCase()}&provider=${provider.name.toLowerCase()}`
+      );
     }
   };
 
   // Handle game click
   const handleGameClick = (game) => {
     setSelectedGame(game);
-    
+
     // Check if user is logged in
     if (!user) {
       setShowLoginPopup(true);
       return;
     }
-    
+
     // If user is logged in, try to open the game
     handleOpenGame(game);
   };
 
   // Handle opening the game
   const handleOpenGame = async (game) => {
+    console.log("Attempting to open game:", game);
+
     // Check if user is logged in
     if (!user) {
-      toast.error('Please login to play games');
+      toast.error("Please login to play games");
       setShowLoginPopup(true);
       return;
     }
 
     try {
       setGameLoading(true);
-      const response = await fetch(`${base_url}/api/user/play-game`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          gameID: game.gameId,
-          slug: "/api/route",
-          username: user.player_id,
-          money: user.balance,
-          userid: user.id
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (data.joyhobeResponse) {
-        navigate('/single-game', {
-          state: { gameUrl: data.joyhobeResponse }
-        });
-      } else {
-        toast.error('Failed to load game. Please try again.');
+
+      const dataaa = game.gameId;
+
+      console.log("Game ID:", dataaa);
+
+      const response = await fetch(`${base_url}/api/games/${game.gameId}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch game with ID ${game.gameId}`);
       }
+
+      const gameData = await response.json();
+      if (!gameData.success) {
+        throw new Error(`Failed to fetch game with ID ${game.gameId}`);
+      }
+
+      console.log("Game data:", gameData?.data?.gameApiID);
+
+      // Step 1: Fetch game data from external API
+      const gameApiIDs = [gameData?.data?.gameApiID]; // Assuming game.gameId is the ID needed; adjust if multiple IDs
+      const externalApiResponse = await axios.post(
+        "https://apigames.oracleapi.net/api/games/by-ids",
+        { ids: gameApiIDs },
+        {
+          headers: {
+            "x-api-key":
+              "f7709c7bd13372f79d71906ee3071d26fdb4338987eb731d8182dd743e0bb5ce",
+          },
+        }
+      );
+
+      // Step 2: Check if external API response is valid
+      if (!externalApiResponse.data || externalApiResponse.data.length === 0) {
+        toast.error("Failed to fetch game data from external API");
+        return;
+      }
+
+      // Assuming externalApiResponse.data contains relevant game data
+      const externalGameData = externalApiResponse?.data?.data[0]; // Adjust based on actual response structure
+      console.log("External API game data:", externalGameData?.game_uuid);
+
+      if (!externalGameData?.game_uuid) {
+        toast.error("Failed to fetch game data from external API");
+        return;
+      }
+
+      navigate(`/game/${externalGameData.game_uuid}`);
     } catch (err) {
-      console.error(err);
-      toast.error('Error connecting to game server');
+      console.error("Error:", err);
+      toast.error("Error connecting to game server");
     } finally {
       setGameLoading(false);
     }
@@ -254,13 +291,13 @@ const CategoryContent = () => {
   // Handle login from popup
   const handleLoginFromPopup = () => {
     setShowLoginPopup(false);
-    navigate('/login');
+    navigate("/login");
   };
 
   // Handle register from popup
   const handleRegisterFromPopup = () => {
     setShowLoginPopup(false);
-    navigate('/register');
+    navigate("/register");
   };
 
   const handleShowMore = () => {
@@ -282,24 +319,28 @@ const CategoryContent = () => {
   // Close popup when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (showLoginPopup && !event.target.closest('.popup-content')) {
+      if (showLoginPopup && !event.target.closest(".popup-content")) {
         setShowLoginPopup(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showLoginPopup]);
 
   // Render provider grid based on the number of providers
   const renderProviderGrid = () => {
     if (providers.length === 0 && exclusiveGames.length === 0) {
-      return <div className="p-4 text-center text-[13px] text-white">No Provider found for this category.</div>;
+      return (
+        <div className="p-4 text-center text-[13px] text-white">
+          No Provider found for this category.
+        </div>
+      );
     }
 
-    if (activeCategory?.name.toLowerCase() === 'exclusive') {
+    if (activeCategory?.name.toLowerCase() === "exclusive") {
       // Render exclusive games in a responsive grid
       return (
         <div className="px-2 md:p-4">
@@ -311,17 +352,36 @@ const CategoryContent = () => {
                 onClick={() => handleGameClick(game)}
               >
                 <div className="w-full aspect-[3/4] relative overflow-hidden">
-                  <img 
-                    src={`${base_url}/${game.landscapeImage || game.portraitImage}`} 
-                    alt={game.name} 
+                  <img
+                    src={`${base_url}/${
+                      game.landscapeImage || game.portraitImage
+                    }`}
+                    alt={game.name}
                     className="w-full h-full transition-transform duration-300 group-hover:scale-105"
                   />
-                  
+
                   {/* Play Button - Always visible on mobile, on hover for desktop */}
-                  <div className={`absolute inset-0 flex items-center justify-center bg-[rgba(0,0,0,0.2)] bg-opacity-40 transition-opacity duration-300 ${isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                  <div
+                    className={`absolute inset-0 flex items-center justify-center bg-[rgba(0,0,0,0.2)] bg-opacity-40 transition-opacity duration-300 ${
+                      isMobile
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100"
+                    }`}
+                  >
                     <div className="bg-theme_color p-2 rounded-full">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-play">
-                        <polygon points="5 3 19 12 5 21 5 3"/>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="lucide lucide-play"
+                      >
+                        <polygon points="5 3 19 12 5 21 5 3" />
                       </svg>
                     </div>
                   </div>
@@ -329,10 +389,10 @@ const CategoryContent = () => {
               </div>
             ))}
           </div>
-          
+
           {hasMoreGames && (
             <div className="flex justify-center mt-4">
-              <button 
+              <button
                 className="px-6 py-2 bg-theme_color cursor-pointer text-white text-sm rounded"
                 onClick={handleShowMore}
               >
@@ -354,13 +414,10 @@ const CategoryContent = () => {
               className="flex justify-start items-center gap-[10px] px-4 py-2 rounded-[3px] bg-[#222424] hover:bg-[#333333] transition-all cursor-pointer text-white"
               onClick={() => handleProviderClick(provider)}
             >
-              <img 
-                src={`${base_url}/${provider.image}`} 
-                alt={provider.name} 
-                className="w-[30px]" 
-                onError={(e) => {
-                  e.target.src = 'https://via.placeholder.com/30x30/222/fff?text=Provider';
-                }}
+              <img
+                src={`${base_url}/${provider.image}`}
+                alt={provider.name}
+                className="w-[30px]"
               />
               <span className="text-sm text-gray-400">{provider.name}</span>
             </div>
@@ -393,7 +450,7 @@ const CategoryContent = () => {
           }
         `}
       </style>
-      
+
       {/* Mobile slider for categories using Embla Carousel */}
       <div className="block lg:hidden px-2 py-4 md:p-4 pt-[40px] relative hidescrollbar">
         <div className="embla" ref={emblaRef}>
@@ -413,7 +470,13 @@ const CategoryContent = () => {
                   alt={category.name}
                   className="w-[45px] absolute top-[-30%] rounded-full transition-transform duration-300 ease-in-out group-hover:rotate-[360deg]"
                 />
-                <span className={`text-[13px] md:text-sm mt-4 font-[500] ${activeCategory?._id === category._id ? "text-white" : "text-gray-400"}`}>
+                <span
+                  className={`text-[13px] md:text-sm mt-4 font-[500] ${
+                    activeCategory?._id === category._id
+                      ? "text-white"
+                      : "text-gray-400"
+                  }`}
+                >
                   {category.name}
                 </span>
               </div>
@@ -421,7 +484,7 @@ const CategoryContent = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Desktop grid for categories */}
       <div className="hidden lg:grid grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 gap-4 p-4 pt-[40px]">
         {categories.map((category) => (
@@ -439,42 +502,58 @@ const CategoryContent = () => {
               alt={category.name}
               className="w-[45px] absolute top-[-30%] rounded-full transition-transform duration-300 ease-in-out group-hover:rotate-[360deg]"
             />
-            <span className={`text-sm mt-4 font-[500] ${activeCategory?._id === category._id ? "text-white" : "text-gray-400"}`}>
+            <span
+              className={`text-sm mt-4 font-[500] ${
+                activeCategory?._id === category._id
+                  ? "text-white"
+                  : "text-gray-400"
+              }`}
+            >
               {category.name}
             </span>
           </div>
         ))}
       </div>
-      
+
       {/* Content area (providers or exclusive games) */}
       {renderProviderGrid()}
 
       {/* Login Popup */}
       {showLoginPopup && (
         <div className="fixed inset-0 bg-[rgba(0,0,0,0.4)] bg-opacity-70 backdrop-blur-md flex items-center justify-center z-[10000] p-4">
-          <div 
-            className="popup-content bg-gradient-to-b cursor-pointer from-[#1a1a1a] to-[#0f0f0f] border border-[#333] rounded-lg p-6 max-w-md w-full relative"
-          >
+          <div className="popup-content bg-gradient-to-b cursor-pointer from-[#1a1a1a] to-[#0f0f0f] border border-[#333] rounded-lg p-6 max-w-md w-full relative">
             {/* Close button */}
-            <button 
+            <button
               onClick={() => setShowLoginPopup(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
-            
+
             {/* Logo */}
             <div className="flex justify-center mb-6">
-             <img src={logo} className='w-[100px]' alt="" />
+              <img src={logo} className="w-[100px]" alt="" />
             </div>
-            
+
             {/* Description */}
             <p className="text-gray-300 text-xs md:text-[15px] text-center mb-6">
-              Please log in to play the game. If you don't have an account, sign up for free!
+              Please log in to play the game. If you don't have an account, sign
+              up for free!
             </p>
-            
+
             {/* Buttons */}
             <div className="flex flex-col gap-3">
               <button
@@ -483,7 +562,7 @@ const CategoryContent = () => {
               >
                 Sign up
               </button>
-              
+
               <button
                 onClick={handleLoginFromPopup}
                 className="bg-[#333] text-center hover:bg-[#444] text-[14px] text-white font-medium py-3 px-4 transition-colors"
@@ -501,9 +580,9 @@ const CategoryContent = () => {
           <div className="flex flex-col items-center">
             {/* Animated logo with pulsing effect */}
             <div className="relative mb-8">
-              <img 
-                src={logo} 
-                alt="Loading..." 
+              <img
+                src={logo}
+                alt="Loading..."
                 className="w-20 h-20 object-contain animate-pulse"
               />
               {/* Spinning ring around logo */}

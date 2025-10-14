@@ -1,47 +1,67 @@
-import React, { useState, useEffect } from 'react';
-import { FaUpload, FaTimes, FaEdit, FaTrash, FaGlobe } from 'react-icons/fa';
-import Header from '../../components/Header';
-import Sidebar from '../../components/Sidebar';
+import React, { useState, useEffect } from "react";
+import { FaUpload, FaTimes, FaEdit, FaTrash, FaGlobe } from "react-icons/fa";
+import Header from "../../components/Header";
+import Sidebar from "../../components/Sidebar";
 import { FaRegFileImage } from "react-icons/fa6";
-import axios from 'axios';
-import toast, { Toaster } from 'react-hot-toast';
+import axios from "axios";
+import toast, { Toaster } from "react-hot-toast";
 
 const Gameproviders = () => {
   const base_url = import.meta.env.VITE_API_KEY_Base_URL;
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [formData, setFormData] = useState({
-    name: '',
-    website: '',
-    category: '',
-    image: null
+    name: "",
+    providerOracleID: "",
+    website: "",
+    category: "",
+    image: null,
   });
   const [imagePreview, setImagePreview] = useState(null);
-  const [providers, setProviders] = useState([]);
+  const [localProviders, setLocalProviders] = useState([]); // Renamed for clarity
+  const [premiumProviders, setPremiumProviders] = useState([]); // New state for premium API providers
   const [categories, setCategories] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState({
     isOpen: false,
     providerId: null,
-    providerName: ''
+    providerName: "",
   });
-  
+
   // Fetch providers and categories on component mount
   useEffect(() => {
-    fetchProviders();
+    fetchLocalProviders(); // Fetch providers from local DB for the table
+    fetchPremiumProviders(); // Fetch providers from premium API for the dropdown
     fetchCategories();
   }, []);
 
-  const fetchProviders = async () => {
+  const fetchLocalProviders = async () => {
     try {
       setIsLoading(true);
       const response = await axios.get(`${base_url}/api/admin/game-providers`);
-      setProviders(response.data);
+      setLocalProviders(response.data);
     } catch (error) {
-      console.error('Error fetching providers:', error);
-      toast.error('Failed to fetch providers');
+      console.error("Error fetching local providers:", error);
+      toast.error("Failed to fetch local providers");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchPremiumProviders = async () => {
+    try {
+      const response = await axios.get(
+        `https://apigames.oracleapi.net/api/providers`,
+        {
+          headers: {
+            "x-api-key": import.meta.env.VITE_PREMIUM_API_KEY,
+          },
+        }
+      );
+      setPremiumProviders(response.data.data); // Access the 'data' array from the response
+    } catch (error) {
+      console.error("Error fetching premium providers:", error);
+      toast.error("Error fetching premium providers");
     }
   };
 
@@ -50,19 +70,28 @@ const Gameproviders = () => {
       const response = await axios.get(`${base_url}/api/admin/game-categories`);
       setCategories(response.data);
     } catch (error) {
-      console.error('Error fetching categories:', error);
-      toast.error('Failed to fetch categories');
+      console.error("Error fetching categories:", error);
+      toast.error("Failed to fetch categories");
     }
   };
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
-  
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value
-    });
+    if (name === "providerSelection") {
+      const selectedProvider = premiumProviders.find((p) => p._id === value);
+      setFormData({
+        ...formData,
+        name: selectedProvider ? selectedProvider.name : "",
+        providerOracleID: value,
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value,
+      });
+    }
   };
 
   const handleImageUpload = (e) => {
@@ -70,7 +99,7 @@ const Gameproviders = () => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData({...formData, image: file});
+        setFormData({ ...formData, image: file });
         setImagePreview(reader.result);
       };
       reader.readAsDataURL(file);
@@ -78,57 +107,66 @@ const Gameproviders = () => {
   };
 
   const removeImage = () => {
-    setFormData({...formData, image: null});
+    setFormData({ ...formData, image: null });
     setImagePreview(null);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     try {
       setIsLoading(true);
       const formDataToSend = new FormData();
-      formDataToSend.append('name', formData.name);
-      formDataToSend.append('website', formData.website);
-      formDataToSend.append('category', formData.category);
+      formDataToSend.append("name", formData.name);
+      formDataToSend.append("providerOracleID", formData.providerOracleID);
+      formDataToSend.append("website", formData.website);
+      formDataToSend.append("category", formData.category);
       if (formData.image) {
-        formDataToSend.append('image', formData.image);
+        formDataToSend.append("image", formData.image);
       }
 
       if (editingId) {
         // Update existing provider
-        await axios.put(`${base_url}/api/admin/game-providers/${editingId}`, formDataToSend, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
+        await axios.put(
+          `${base_url}/api/admin/game-providers/${editingId}`,
+          formDataToSend,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
           }
-        });
-        toast.success('Provider updated successfully');
+        );
+        toast.success("Provider updated successfully");
       } else {
         // Create new provider
-        await axios.post(`${base_url}/api/admin/game-providers`, formDataToSend, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
+        await axios.post(
+          `${base_url}/api/admin/game-providers`,
+          formDataToSend,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
           }
-        });
-        toast.success('Provider added successfully');
+        );
+        toast.success("Provider added successfully");
       }
-      
+
       // Refresh the providers list
-      fetchProviders();
-      
+      fetchLocalProviders();
+
       // Reset form
       setFormData({
-        name: '',
-        website: '',
-        category: '',
-        image: null
+        name: "",
+        providerOracleID: "",
+        website: "",
+        category: "",
+        image: null,
       });
       setImagePreview(null);
       setEditingId(null);
-      
     } catch (error) {
-      console.error('Error saving provider:', error);
-      const errorMsg = error.response?.data?.error || 'Failed to save provider';
+      console.error("Error saving provider:", error);
+      const errorMsg = error.response?.data?.error || "Failed to save provider";
       toast.error(errorMsg);
     } finally {
       setIsLoading(false);
@@ -138,9 +176,10 @@ const Gameproviders = () => {
   const editProvider = (provider) => {
     setFormData({
       name: provider.name,
+      providerOracleID: provider.providerOracleID || "",
       website: provider.website,
-      category: provider.category || '',
-      image: null
+      category: provider.category || "",
+      image: null,
     });
     setImagePreview(provider.image);
     setEditingId(provider._id);
@@ -148,10 +187,11 @@ const Gameproviders = () => {
 
   const cancelEdit = () => {
     setFormData({
-      name: '',
-      website: '',
-      category: '',
-      image: null
+      name: "",
+      providerOracleID: "",
+      website: "",
+      category: "",
+      image: null,
     });
     setImagePreview(null);
     setEditingId(null);
@@ -160,19 +200,22 @@ const Gameproviders = () => {
   const toggleStatus = async (provider) => {
     try {
       const newStatus = !provider.status;
-      await axios.put(`${base_url}/api/admin/game-providers/${provider._id}/status`, {
-        status: newStatus
-      });
-      
+      await axios.put(
+        `${base_url}/api/admin/game-providers/${provider._id}/status`,
+        {
+          status: newStatus,
+        }
+      );
+
       // Update local state
-      setProviders(providers.map(p => 
-        p._id === provider._id ? { ...p, status: newStatus } : p
-      ));
-      
-      toast.success(`Provider ${newStatus ? 'activated' : 'deactivated'} successfully`);
+      fetchLocalProviders();
+
+      toast.success(
+        `Provider ${newStatus ? "activated" : "deactivated"} successfully`
+      );
     } catch (error) {
-      console.error('Error updating status:', error);
-      toast.error('Failed to update status');
+      console.error("Error updating status:", error);
+      toast.error("Failed to update status");
     }
   };
 
@@ -180,7 +223,7 @@ const Gameproviders = () => {
     setDeleteConfirm({
       isOpen: true,
       providerId: provider._id,
-      providerName: provider.name
+      providerName: provider.name,
     });
   };
 
@@ -188,27 +231,29 @@ const Gameproviders = () => {
     setDeleteConfirm({
       isOpen: false,
       providerId: null,
-      providerName: ''
+      providerName: "",
     });
   };
 
   const deleteProvider = async () => {
     try {
       setIsLoading(true);
-      await axios.delete(`${base_url}/api/admin/game-providers/${deleteConfirm.providerId}`);
-      
+      await axios.delete(
+        `${base_url}/api/admin/game-providers/${deleteConfirm.providerId}`
+      );
+
       // Update local state
-      setProviders(providers.filter(provider => provider._id !== deleteConfirm.providerId));
-      
+      fetchLocalProviders();
+
       // If editing the deleted provider, cancel edit
       if (editingId === deleteConfirm.providerId) {
         cancelEdit();
       }
-      
-      toast.success('Provider deleted successfully');
+
+      toast.success("Provider deleted successfully");
     } catch (error) {
-      console.error('Error deleting provider:', error);
-      toast.error('Failed to delete provider');
+      console.error("Error deleting provider:", error);
+      toast.error("Failed to delete provider");
     } finally {
       setIsLoading(false);
       closeDeleteConfirm();
@@ -223,9 +268,12 @@ const Gameproviders = () => {
       {deleteConfirm.isOpen && (
         <div className="fixed inset-0 bg-[rgba(0,0,0,0.4)] bg-opacity-50 flex items-center justify-center z-[1000] backdrop-blur-md">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Confirm Delete</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              Confirm Delete
+            </h3>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete the provider "{deleteConfirm.providerName}"? This action cannot be undone.
+              Are you sure you want to delete the provider "
+              {deleteConfirm.providerName}"? This action cannot be undone.
             </p>
             <div className="flex justify-end space-x-3">
               <button
@@ -240,7 +288,7 @@ const Gameproviders = () => {
                 className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
                 disabled={isLoading}
               >
-                {isLoading ? 'Deleting...' : 'Delete'}
+                {isLoading ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>
@@ -252,36 +300,47 @@ const Gameproviders = () => {
 
         <main
           className={`transition-all duration-300 flex-1 p-6 overflow-y-auto h-[90vh] ${
-            isSidebarOpen ? 'md:ml-[40%] lg:ml-[28%] xl:ml-[17%] ' : 'ml-0'
+            isSidebarOpen ? "md:ml-[40%] lg:ml-[28%] xl:ml-[17%] " : "ml-0"
           }`}
         >
           <div className="w-full mx-auto">
-            <h1 className="text-2xl font-bold text-gray-800 mb-6">Game Providers</h1>
-            
+            <h1 className="text-2xl font-bold text-gray-800 mb-6">
+              Game Providers
+            </h1>
+
             {/* Add/Edit Provider Form */}
             <div className="bg-white rounded-[5px] p-6 border border-gray-200 mb-8">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">
-                {editingId ? 'Edit Provider' : 'Add New Provider'}
+                {editingId ? "Edit Provider" : "Add New Provider"}
               </h2>
               <form onSubmit={handleSubmit}>
                 {/* Provider Name Field */}
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Provider Name</label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Provider Name
+                  </label>
+                  <select
+                    name="providerSelection"
+                    value={formData.providerOracleID}
                     onChange={handleInputChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-[3px] outline-theme_color"
-                    placeholder="Enter provider name"
                     required
                     disabled={isLoading}
-                  />
+                  >
+                    <option value="">Select a provider</option>
+                    {premiumProviders.map((provider) => (
+                      <option key={provider._id} value={provider._id}>
+                        {provider.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                
+
                 {/* Website Field */}
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Website URL</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Website URL
+                  </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <FaGlobe className="text-gray-400" />
@@ -298,10 +357,12 @@ const Gameproviders = () => {
                     />
                   </div>
                 </div>
-                
+
                 {/* Category Selection Field */}
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Category
+                  </label>
                   <select
                     name="category"
                     value={formData.category}
@@ -312,25 +373,26 @@ const Gameproviders = () => {
                   >
                     <option value="">Select a category</option>
                     {categories
-                      .filter(category => category.status) // Only show active categories
-                      .map(category => (
+                      .filter((category) => category.status) // Only show active categories
+                      .map((category) => (
                         <option key={category._id} value={category.name}>
                           {category.name}
                         </option>
-                      ))
-                    }
+                      ))}
                   </select>
                 </div>
-                
+
                 {/* Image Upload Section */}
                 <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Provider Logo</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Provider Logo
+                  </label>
                   <div className="flex items-center justify-center w-full">
                     {imagePreview ? (
                       <div className="relative w-full">
-                        <img 
-                          src={imagePreview} 
-                          alt="Provider preview" 
+                        <img
+                          src={imagePreview}
+                          alt="Provider preview"
                           className="h-48 w-full object-contain border border-gray-300 rounded-md"
                         />
                         <button
@@ -346,11 +408,13 @@ const Gameproviders = () => {
                       <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
                           <FaRegFileImage className="w-8 md:w-12 h-8 mb-3 md:h-12 text-gray-400" />
-                          <p className="mb-2 text-sm text-gray-500">Click to upload provider logo</p>
+                          <p className="mb-2 text-sm text-gray-500">
+                            Click to upload provider logo
+                          </p>
                         </div>
-                        <input 
-                          type="file" 
-                          className="hidden" 
+                        <input
+                          type="file"
+                          className="hidden"
                           accept="image/*"
                           onChange={handleImageUpload}
                           disabled={isLoading}
@@ -359,7 +423,7 @@ const Gameproviders = () => {
                     )}
                   </div>
                 </div>
-                
+
                 {/* Form Actions */}
                 <div className="flex justify-end mt-8 space-x-3">
                   {editingId && (
@@ -377,74 +441,103 @@ const Gameproviders = () => {
                     className="px-6 py-2 bg-orange-500 text-white font-medium rounded-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors"
                     disabled={isLoading}
                   >
-                    {isLoading ? 'Processing...' : (editingId ? 'Update Provider' : 'Add Provider')}
+                    {isLoading
+                      ? "Processing..."
+                      : editingId
+                      ? "Update Provider"
+                      : "Add Provider"}
                   </button>
                 </div>
               </form>
             </div>
-            
+
             {/* Providers Table */}
             <div className="">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">All Providers</h2>
-              
-              {isLoading && providers.length === 0 ? (
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">
+                All Providers
+              </h2>
+
+              {isLoading && localProviders.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
                   <p className="mt-2 text-gray-600">Loading providers...</p>
                 </div>
-              ) : providers.length === 0 ? (
+              ) : localProviders.length === 0 ? (
                 <div className="text-center py-8 bg-white rounded-lg border border-gray-200">
-                  <p className="text-gray-500">No providers found. Add your first provider above.</p>
+                  <p className="text-gray-500">
+                    No providers found. Add your first provider above.
+                  </p>
                 </div>
               ) : (
                 <div className="overflow-x-auto border-[1px] border-gray-200">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-theme_color">
                       <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider"
+                        >
                           Logo
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider"
+                        >
                           Name
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider"
+                        >
                           Website
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider"
+                        >
                           Category
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider"
+                        >
                           Status
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider">
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider"
+                        >
                           Actions
                         </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {providers.map((provider) => {
+                      {localProviders.map((provider) => {
                         // Find category name for this provider
-                        const category = categories.find(cat => cat._id === provider.category);
-                        const categoryName = category ? category.name : 'Uncategorized';
-                        
+                        // const category = categories.find(cat => cat._id === provider.category);
+                        // const categoryName = category ? category.name : 'Uncategorized';
+                        const categoryName = provider.category;
+
                         return (
                           <tr key={provider._id}>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="h-10 w-10 flex-shrink-0">
-                                <img 
-                                  className="h-10 w-10 rounded-full object-cover" 
-                                  src={`${base_url}/${provider.image}`} 
-                                  alt={provider.name} 
+                                <img
+                                  className="h-10 w-10 rounded-full object-cover"
+                                  src={`${base_url}/${provider.image}`}
+                                  alt={provider.name}
                                 />
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{provider.name}</div>
+                              <div className="text-sm text-gray-900">
+                                {provider.name}
+                              </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <a 
-                                href={provider.website} 
-                                target="_blank" 
+                              <a
+                                href={provider.website}
+                                target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-sm text-blue-500 hover:text-blue-700 truncate max-w-xs block"
                               >
@@ -452,32 +545,34 @@ const Gameproviders = () => {
                               </a>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{categoryName}</div>
+                              <div className="text-sm text-gray-900">
+                                {categoryName}
+                              </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <label className="relative inline-flex items-center cursor-pointer">
-                                <input 
-                                  type="checkbox" 
-                                  className="sr-only peer" 
+                                <input
+                                  type="checkbox"
+                                  className="sr-only peer"
                                   checked={provider.status}
                                   onChange={() => toggleStatus(provider)}
                                   disabled={isLoading}
                                 />
                                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
                                 <span className="ml-3 text-sm font-medium text-gray-900">
-                                  {provider.status ? 'Active' : 'Inactive'}
+                                  {provider.status ? "Active" : "Inactive"}
                                 </span>
                               </label>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              <button 
+                              <button
                                 className="px-[8px] py-[7px] text-white bg-blue-600 cursor-pointer rounded-[3px] text-[16px] mr-3 hover:bg-blue-700 transition-colors"
                                 onClick={() => editProvider(provider)}
                                 disabled={isLoading}
                               >
                                 <FaEdit />
                               </button>
-                              <button 
+                              <button
                                 className="px-[8px] py-[7px] text-white bg-red-600 cursor-pointer rounded-[3px] text-[16px] hover:bg-red-700 transition-colors"
                                 onClick={() => confirmDelete(provider)}
                                 disabled={isLoading}

@@ -133,9 +133,10 @@ export const Slider = memo(() => {
         {slides.map((slide) => (
           <div key={slide.id} className="w-full flex-shrink-0">
             <img
-              src={`${base_url}/${slide.src}`}
+              // src={`${base_url}${slide.src}`}
+              src={`${"https://api.1xwin.live/"}${slide.src}`}
               alt={slide.alt}
-              className="w-full h-[180px] md:h-[200px] lg:h-[250px] object-cover"
+              className="w-full h-full object-cover"
               loading="lazy" // Add lazy loading for images
             />
           </div>
@@ -196,7 +197,9 @@ export const Slider = memo(() => {
               key={index}
               onClick={() => goToSlide(index)}
               className={`w-2 h-2 rounded-full transition-all cursor-pointer duration-300 ${
-                index === currentSlide ? "bg-theme_color w-6" : "bg-theme_gray/80"
+                index === currentSlide
+                  ? "bg-theme_color w-6"
+                  : "bg-theme_gray/80"
               }`}
               aria-label={`Go to slide ${index + 1}`}
             />
