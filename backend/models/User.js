@@ -22,6 +22,51 @@ const BONUS_CONFIG = {
   DAILY_WITHDRAWAL_LIMIT: 50000
 };
 
+// Click Tracking Schema
+const clickTrackSchema = new Schema({
+  clickId: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  affiliate: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Affiliate',
+    required: true
+  },
+  affiliateCode: {
+    type: String,
+    required: true
+  },
+  ipAddress: String,
+  userAgent: String,
+  source: {
+    type: String,
+    default: 'direct'
+  },
+  campaign: {
+    type: String,
+    default: 'general'
+  },
+  medium: {
+    type: String,
+    default: 'referral'
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now
+  },
+  converted: {
+    type: Boolean,
+    default: false
+  },
+  convertedAt: Date,
+  conversionValue: {
+    type: Number,
+    default: 0
+  }
+});
+
 // Bonus Activity Log Schema
 const bonusActivitySchema = new Schema({
     bonusType: {
@@ -52,17 +97,44 @@ const bonusActivitySchema = new Schema({
     }
 });
 
+// Affiliate Referral Schema
+const affiliateReferralSchema = new Schema({
+  affiliateId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Affiliate',
+    required: true
+  },
+  affiliateCode: {
+    type: String,
+    required: true
+  },
+  clickId: {
+    type: String,
+    ref: 'ClickTrack'
+  },
+  commissionEarned: {
+    type: Number,
+    default: 0
+  },
+  commissionRate: {
+    type: Number,
+    default: 0.1
+  },
+  referredAt: {
+    type: Date,
+    default: Date.now
+  },
+  status: {
+    type: String,
+    enum: ['active', 'converted', 'expired'],
+    default: 'active'
+  }
+});
+
 // User Schema
 const UserSchema = new Schema({
     // ========== BASIC INFORMATION ==========
-email: {
-    type: String,
-    default: null,
-    // Add setter to convert empty string to null
-    set: function(v) {
-        return v === '' ? null : v;
-    }
-},
+// In your UserSchema, change the email field to:
     username: {
         type: String,
         unique: true,
@@ -390,6 +462,33 @@ email: {
         }
     }],
 
+    // ========== AFFILIATE REFERRAL TRACKING ==========
+    affiliateReferral: {
+        type: affiliateReferralSchema,
+        default: null
+    },
+
+    // ========== REGISTRATION SOURCE TRACKING ==========
+    registrationSource: {
+        type: {
+            type: String,
+            enum: ['direct', 'user_referral', 'affiliate_referral', 'organic', 'social', 'other'],
+            default: 'direct'
+        },
+        source: String,
+        medium: String,
+        campaign: String,
+        clickId: String,
+        affiliateCode: String,
+        landingPage: String,
+        ipAddress: String,
+        userAgent: String,
+        timestamp: {
+            type: Date,
+            default: Date.now
+        }
+    },
+
     // ========== TRANSACTION HISTORIES ==========
     // Adding the betHistory field to store betting records
     betHistory: [
@@ -499,7 +598,7 @@ email: {
     transactionHistory: [{
         type: {
             type: String,
-            enum: ['deposit', 'withdrawal', 'bonus', 'bet', 'win', 'penalty'],
+            enum: ['deposit', 'withdrawal', 'bonus', 'bet', 'win', 'penalty', 'affiliate_commission'],
             required: true
         },
         amount: {
@@ -516,6 +615,10 @@ email: {
         },
         description: String,
         referenceId: String,
+        affiliateId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Affiliate'
+        },
         createdAt: {
             type: Date,
             default: Date.now
@@ -592,6 +695,10 @@ UserSchema.virtual('wageringStatus').get(function() {
     };
 });
 
+UserSchema.virtual('isAffiliateReferred').get(function() {
+    return !!this.affiliateReferral;
+});
+
 // ========== PRE-SAVE HOOKS ==========
 UserSchema.pre('save', async function(next) {
     if (!this.player_id) {
@@ -647,6 +754,142 @@ UserSchema.pre('save', async function(next) {
 
     next();
 });
+
+// ========== AFFILIATE TRACKING METHODS ==========
+UserSchema.methods.trackAffiliateConversion = async function(affiliateId, affiliateCode, clickId = null) {
+    const Affiliate = mongoose.model('Affiliate');
+    const ClickTrack = mongoose.model('ClickTrack');
+    
+    // Find the affiliate
+    const affiliate = await Affiliate.findById(affiliateId);
+    if (!affiliate) {
+        throw new Error('Affiliate not found');
+    }
+
+    // Update click track if clickId is provided
+    if (clickId) {
+        await ClickTrack.findOneAndUpdate(
+            { clickId, affiliate: affiliateId },
+            { 
+                converted: true,
+                convertedAt: new Date()
+            }
+        );
+    }
+
+    // Set affiliate referral data
+    this.affiliateReferral = {
+        affiliateId,
+        affiliateCode,
+        clickId,
+        commissionRate: affiliate.commissionRate || 0.1,
+        referredAt: new Date(),
+        status: 'active'
+    };
+
+    // Update registration source
+    this.registrationSource = {
+        type: 'affiliate_referral',
+        source: 'affiliate',
+        medium: 'referral',
+        campaign: 'affiliate_program',
+        clickId,
+        affiliateCode,
+        landingPage: '/register',
+        ipAddress: this.registrationSource?.ipAddress,
+        userAgent: this.registrationSource?.userAgent,
+        timestamp: new Date()
+    };
+
+    await this.save();
+
+    // Add user to affiliate's referred users
+    await Affiliate.findByIdAndUpdate(affiliateId, {
+        $push: {
+            referredUsers: {
+                user: this._id,
+                joinedAt: new Date(),
+                earnedAmount: 0,
+                userStatus: 'active',
+                lastActivity: new Date()
+            }
+        },
+        $inc: {
+            referralCount: 1,
+            activeReferrals: 1
+        }
+    });
+
+    return this;
+};
+
+UserSchema.methods.awardAffiliateCommission = async function(amount, transactionType = 'deposit') {
+    if (!this.affiliateReferral) {
+        return null;
+    }
+
+    const Affiliate = mongoose.model('Affiliate');
+    const affiliate = await Affiliate.findById(this.affiliateReferral.affiliateId);
+    
+    if (!affiliate) {
+        return null;
+    }
+
+    // Calculate commission based on transaction type
+    let commissionRate = this.affiliateReferral.commissionRate;
+    let commissionAmount = 0;
+
+    switch (transactionType) {
+        case 'deposit':
+            commissionAmount = amount * commissionRate;
+            break;
+        case 'bet':
+            commissionAmount = amount * (commissionRate * 0.1); // 10% of normal rate for bets
+            break;
+        case 'win':
+            commissionAmount = amount * (commissionRate * 0.05); // 5% of normal rate for wins
+            break;
+        default:
+            commissionAmount = amount * commissionRate;
+    }
+
+    if (commissionAmount <= 0) {
+        return null;
+    }
+
+    // Update affiliate earnings
+    await Affiliate.findByIdAndUpdate(affiliate._id, {
+        $inc: {
+            pendingEarnings: commissionAmount,
+            totalEarnings: commissionAmount
+        }
+    });
+
+    // Update affiliate referral record
+    this.affiliateReferral.commissionEarned += commissionAmount;
+    this.affiliateReferral.status = 'converted';
+    await this.save();
+
+    // Add transaction record
+    this.transactionHistory.push({
+        type: 'affiliate_commission',
+        amount: commissionAmount,
+        balanceBefore: this.balance,
+        balanceAfter: this.balance,
+        description: `Affiliate commission for ${transactionType}`,
+        referenceId: `AFF-${Date.now()}`,
+        affiliateId: affiliate._id
+    });
+
+    await this.save();
+
+    return {
+        affiliate: affiliate._id,
+        commissionAmount,
+        transactionType,
+        userId: this._id
+    };
+};
 
 // ========== WITHDRAWAL METHODS ==========
 UserSchema.methods.canWithdraw = function(amount) {
@@ -777,6 +1020,11 @@ UserSchema.methods.completeDeposit = async function(orderId, transactionId) {
     this.balance += deposit.amount;
     this.total_deposit += deposit.amount;
 
+    // Award affiliate commission for deposit
+    if (this.affiliateReferral) {
+        await this.awardAffiliateCommission(deposit.amount, 'deposit');
+    }
+
     if (bonusAmount > 0) {
         this.bonusBalance += bonusAmount;
 
@@ -817,6 +1065,11 @@ UserSchema.methods.completeDeposit = async function(orderId, transactionId) {
 UserSchema.methods.applyBetToWagering = async function(amount) {
     this.totalWagered += amount;
     this.total_bet += amount;
+
+    // Award affiliate commission for betting activity
+    if (this.affiliateReferral) {
+        await this.awardAffiliateCommission(amount, 'bet');
+    }
 
     if (this.bonusInfo.activeBonuses.length > 0) {
         for (const bonus of this.bonusInfo.activeBonuses) {
@@ -914,5 +1167,22 @@ UserSchema.statics.findByEmailOrPhone = async function(emailOrPhone) {
     });
 };
 
+// Add password verification method
+UserSchema.methods.verifyPassword = async function(password) {
+    return bcrypt.compare(password, this.password);
+};
+
+// Generate click ID helper function
+function generateClickId() {
+    return 'CLK' + Math.random().toString(36).substr(2, 12).toUpperCase();
+}
+
+// Generate player ID helper function
+function generatePlayerId() {
+    return 'PL' + Math.random().toString(36).substr(2, 8).toUpperCase();
+}
+
 const User = mongoose.model('User', UserSchema);
-module.exports = User;
+const ClickTrack = mongoose.model('ClickTrack', clickTrackSchema);
+
+module.exports = { User, ClickTrack };

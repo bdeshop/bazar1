@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
 import videoBackgroundUrl from "../../assets/mainvideo.mp4";
-import { NavLink } from 'react-router-dom';
+import { NavLink, useSearchParams } from 'react-router-dom';
 import logo from "../../assets/logo.png";
 
 export default function Register() {
@@ -14,6 +14,7 @@ export default function Register() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [referralCode, setReferralCode] = useState("");
+  const [affiliateCode, setAffiliateCode] = useState(""); // New state for affiliate code
   const [phoneError, setPhoneError] = useState("");
   const [loginError, setLoginError] = useState("");
   const [signupError, setSignupError] = useState("");
@@ -24,11 +25,52 @@ export default function Register() {
   const [isCheckingReferral, setIsCheckingReferral] = useState(false);
   const [referralValid, setReferralValid] = useState(false);
   const [referrerInfo, setReferrerInfo] = useState(null);
+  const [searchParams] = useSearchParams();
 
   // API base URL
   const API_BASE_URL = import.meta.env.VITE_API_KEY_Base_URL;
 
-  // Check if referral code is valid
+  // Check for referral codes in URL parameters on component mount
+  useEffect(() => {
+    const userReferralCode = searchParams.get('ref'); // Regular user referral
+    const affiliateCodeFromUrl = searchParams.get('aff'); // Affiliate code
+    
+    console.log('URL Params:', { userReferralCode, affiliateCodeFromUrl });
+
+    // Track affiliate click if affiliate code is present
+    if (affiliateCodeFromUrl) {
+      setAffiliateCode(affiliateCodeFromUrl.toUpperCase()); // Store affiliate code
+      trackAffiliateClick(affiliateCodeFromUrl);
+    }
+
+    // Set regular user referral code in the input field
+    if (userReferralCode) {
+      setReferralCode(userReferralCode.toUpperCase());
+      // Don't auto-validate - let user verify manually if they want
+    }
+  }, [searchParams]);
+
+  // Track affiliate click separately
+  const trackAffiliateClick = async (affiliateCode) => {
+    const source = searchParams.get('source');
+    const campaign = searchParams.get('campaign');
+    const medium = searchParams.get('medium');
+
+    try {
+      await axios.post(`${API_BASE_URL}/api/auth/track-click`, {
+        affiliateCode,
+        source: source || 'direct',
+        campaign: campaign || 'general',
+        medium: medium || 'referral',
+        landingPage: window.location.pathname
+      });
+      console.log('Affiliate click tracked successfully for:', affiliateCode);
+    } catch (error) {
+      console.error('Failed to track affiliate click:', error);
+    }
+  };
+
+  // Check if referral code is valid (only for regular user referrals)
   const checkReferralCode = async () => {
     if (!referralCode) {
       setReferralError("Please enter a referral code");
@@ -39,19 +81,20 @@ export default function Register() {
     setReferralError("");
 
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/auth/check-referral/${referralCode}`);
+      // Only check for regular user referrals in the input field
+      const userResponse = await axios.get(`${API_BASE_URL}/api/auth/check-referral/${referralCode}`);
       
-      if (response.data.success) {
+      if (userResponse.data.success) {
         setReferralValid(true);
-        setReferrerInfo(response.data.referrer);
+        setReferrerInfo(userResponse.data.referrer);
         toast.success("Referral code is valid!", {
           position: "top-right",
           autoClose: 3000,
         });
       }
-    } catch (error) {
-      console.error('Referral check error:', error);
-      const errorMessage = error.response?.data?.message || 'Invalid referral code';
+    } catch (userError) {
+      console.error('Referral check error:', userError);
+      const errorMessage = userError.response?.data?.message || 'Invalid referral code';
       setReferralError(errorMessage);
       setReferralValid(false);
       setReferrerInfo(null);
@@ -142,10 +185,11 @@ export default function Register() {
         confirmPassword,
         fullName,
         email,
-        referralCode: referralValid ? referralCode : undefined
+        referralCode: referralValid ? referralCode : undefined,
+        affiliateCode: affiliateCode || undefined // Include affiliate code in the payload
       });
       
-      if(response.data.success){
+      if (response.data.success) {
         toast.success('Account created successfully!', {
           position: "top-right",
           autoClose: 3000,
@@ -154,6 +198,19 @@ export default function Register() {
           pauseOnHover: true,
           draggable: true,
         });
+
+        // Show appropriate referral success message
+        if (response.data.user.isAffiliateReferred) {
+          toast.success('Welcome! You were referred by an affiliate.', {
+            position: "top-right",
+            autoClose: 3000,
+          });
+        } else if (response.data.user.isUserReferred) {
+          toast.success('Welcome! Your referral has been recorded.', {
+            position: "top-right",
+            autoClose: 3000,
+          });
+        }
 
         // Store token in localStorage
         localStorage.setItem('token', response.data.token);
@@ -168,6 +225,7 @@ export default function Register() {
         setPassword("");
         setConfirmPassword("");
         setReferralCode("");
+        setAffiliateCode(""); // Reset affiliate code
         setReferralValid(false);
         setReferrerInfo(null);
 
@@ -176,7 +234,7 @@ export default function Register() {
           window.location.href = '/';
         }, 2000);
       } else {
-        toast.error(`${response.data.message}`)
+        toast.error(`${response.data.message}`);
       }
     } catch (error) {
       console.error('Signup error:', error);
@@ -229,7 +287,7 @@ export default function Register() {
         password
       });
       
-      if(response.data.success){
+      if (response.data.success) {
         toast.success('Login successful!', {
           position: "top-right",
           autoClose: 3000,
@@ -248,7 +306,7 @@ export default function Register() {
           window.location.href = '/';
         }, 1000);
       } else {
-        toast.error(`${response.data.message}`)
+        toast.error(`${response.data.message}`);
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -275,13 +333,8 @@ export default function Register() {
     }
   };
 
-  // Calculate progress percentage for the progress bar
-  const getProgressPercentage = () => {
-    return (currentStep - 1) / 2 * 100; // 3 steps total, so (currentStep-1)/2
-  };
-
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gray-900  font-poppins text-white">
+    <div className="relative min-h-screen overflow-hidden bg-gray-900 font-poppins text-white">
       {/* Toast Container */}
       <Toaster/>
       {/* Background Video */}
@@ -305,14 +358,16 @@ export default function Register() {
           </NavLink>
         </div>
       </header>
-       <video className="md:hidden " autoPlay loop muted>
+      
+      <video className="md:hidden" autoPlay loop muted>
         <source src={videoBackgroundUrl} type="video/mp4" />
       </video>
+
       {/* Main Content */}
       <div className="relative flex justify-center md:justify-end items-center h-full md:min-h-[calc(100vh-76px)] md:p-6 lg:p-8 xl:p-[100px]">
-        <div className="w-full px-[10px] md:px-0 md:max-w-lg   bg-opacity-80 overflow-hidden ">
+        <div className="w-full px-[10px] md:px-0 md:max-w-lg bg-opacity-80 overflow-hidden">
           {/* Tab Navigation */}
-          <div className="flex border-b  border-gray-700">
+          <div className="flex border-b border-gray-700">
             <button 
               onClick={() => {setIsSignUpActive(false); setCurrentStep(1);}} 
               className={`flex-1 py-3 md:py-4 text-center text-sm md:text-base font-medium cursor-pointer transition-colors duration-300 ${!isSignUpActive ? 'border-b-2 border-green-500 text-green-500' : 'text-gray-200'}`}
@@ -332,38 +387,6 @@ export default function Register() {
             {isSignUpActive ? (
               <>
                 <h2 className="text-lg md:text-xl lg:text-2xl font-[500] text-white mb-4">Sign up</h2>
-
-                {/* Progress Bar */}
-                {/* <div className="mb-6">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs text-gray-400">Step {currentStep} of 3</span>
-                    <span className="text-xs text-gray-400">{Math.round(getProgressPercentage())}%</span>
-                  </div>
-                  <div className="w-full bg-gray-700 rounded-full h-2.5">
-                    <div 
-                      className="bg-theme_color h-2.5 rounded-full transition-all duration-500 ease-in-out" 
-                      style={{ width: `${getProgressPercentage()}%` }}
-                    ></div>
-                  </div>
-                </div> */}
-
-                {/* Step Indicator */}
-                {/* <div className="flex items-center justify-between mb-4 md:mb-6">
-                  <div className="flex flex-col items-center">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1 ${currentStep >= 1 ? 'bg-theme_color text-white' : 'bg-gray-700 text-gray-400'}`}>1</div>
-                    <span className={`text-xs ${currentStep >= 1 ? 'text-white' : 'text-gray-400'}`}>Contact</span>
-                  </div>
-                  <div className={`flex-1 h-0.5 mx-1 ${currentStep >= 2 ? 'bg-green-500' : 'bg-gray-700'}`}></div>
-                  <div className="flex flex-col items-center">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1 ${currentStep >= 2 ? 'bg-theme_color text-white' : 'bg-gray-700 text-gray-400'}`}>2</div>
-                    <span className={`text-xs ${currentStep >= 2 ? 'text-white' : 'text-gray-400'}`}>Personal</span>
-                  </div>
-                  <div className={`flex-1 h-0.5 mx-1 ${currentStep >= 3 ? 'bg-green-500' : 'bg-gray-700'}`}></div>
-                  <div className="flex flex-col items-center">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1 ${currentStep >= 3 ? 'bg-theme_color text-white' : 'bg-gray-700 text-gray-400'}`}>3</div>
-                    <span className={`text-xs ${currentStep >= 3 ? 'text-white' : 'text-gray-400'}`}>Password</span>
-                  </div>
-                </div> */}
 
                 {/* Step 1: Contact Information */}
                 {currentStep === 1 && (
@@ -415,10 +438,10 @@ export default function Register() {
                       {phoneError && <p className="text-red-500 text-xs mt-1">{phoneError}</p>}
                     </div>
 
-                    {/* Referral Code Input */}
+                    {/* Referral Code Input - Only for regular users */}
                     <div className="mb-4">
                       <label htmlFor="referralCode" className="block text-xs md:text-sm text-gray-400 mb-2">
-                        Referral Code (Optional)
+                        Friend's Referral Code (Optional)
                       </label>
                       <div className="flex gap-2">
                         <input
@@ -431,7 +454,7 @@ export default function Register() {
                             setReferrerInfo(null);
                           }}
                           className="flex-1 p-2 md:p-3 text-sm md:text-base bg-gray-800 border border-gray-700 text-white rounded focus:outline-none"
-                          placeholder="Enter referral code"
+                          placeholder="Enter friend's referral code"
                           disabled={referralValid}
                         />
                         {!referralValid && (
@@ -452,7 +475,7 @@ export default function Register() {
                               setReferralValid(false);
                               setReferrerInfo(null);
                             }}
-                            className="px-3 md:px-4 bg-red-600  text-white rounded text-sm font-[500]"
+                            className="px-3 md:px-4 bg-red-600 text-white rounded text-sm font-[500]"
                           >
                             Change
                           </button>
@@ -464,12 +487,15 @@ export default function Register() {
                           Valid referral code from {referrerInfo.username}
                         </p>
                       )}
+                      <p className="text-gray-400 text-xs mt-1">
+                        Enter your friend's referral code to get bonus credits
+                      </p>
                     </div>
 
                     {/* Continue Button */}
                     <button
                       type="submit"
-                      className="w-full py-2 md:py-3 bg-theme_color  text-white cursor-pointer text-sm md:text-base font-[600] mt-4 shadow-lg transition-transform transform hover:scale-[1.02] disabled:opacity-50"
+                      className="w-full py-2 md:py-3 bg-theme_color text-white cursor-pointer text-sm md:text-base font-[600] mt-4 shadow-lg transition-transform transform hover:scale-[1.02] disabled:opacity-50"
                       disabled={isLoading}
                     >
                       {isLoading ? 'Processing...' : 'Continue'}
@@ -506,20 +532,6 @@ export default function Register() {
                         disabled={isLoading}
                       />
                     </div>
-
-                    {/* Email Input */}
-                    {/* <div className="mb-4">
-                      <label htmlFor="email" className="block text-xs md:text-sm text-gray-400 mb-2">Email (Optional)</label>
-                      <input
-                        type="email"
-                        id="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full p-2 md:p-3 text-sm md:text-base bg-gray-800 border border-gray-700 text-white rounded focus:outline-none font-[400]"
-                        placeholder="Enter your email"
-                        disabled={isLoading}
-                      />
-                    </div> */}
                     
                     {/* Username Input */}
                     <div className="mb-4">
