@@ -199,12 +199,12 @@ const Sidebar = ({ isOpen }) => {
           icon: <FiTrendingUp className="text-[18px]" />,
           key: 'affiliate',
           links: [
-            { to: '/affiliate/affiliates', text: 'All Affiliates' },
-            { to: '/affiliate/commission-structure', text: 'Commission Structure' },
-            { to: '/affiliate/payouts', text: 'Payouts' },
-            { to: '/affiliate/referrals', text: 'Referral Tracking' },
-            { to: '/affiliate/performance', text: 'Performance Reports' },
-            { to: '/affiliate/marketing-materials', text: 'Marketing Materials' },
+            { to: '/affiliates/all-affiliates', text: 'All Affiliates' },
+            { to: '/affiliates/payout', text: 'Payouts' },
+            { to: '/affiliates/set-affilaite-payout-amount', text: 'Amount' },
+            // { to: '/affiliate/referrals', text: 'Referral Tracking' },
+            // { to: '/affiliate/performance', text: 'Performance Reports' },
+            // { to: '/affiliate/marketing-materials', text: 'Marketing Materials' },
           ],
         },
         // {

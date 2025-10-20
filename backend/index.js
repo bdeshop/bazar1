@@ -8,6 +8,8 @@ const Adminauth=require("./routes/Adminauth");
 const Adminrouter = require("./routes/Adminroute");
 const Userrouter = require("./routes/Userroute");
 const router = require("./routes/router");
+const Affiliateroute = require("./routes/Affiliateroute");
+const Masteraffiliateroute = require("./routes/Masteraffiliateroute");
 
 app.use(cors({
   origin: [
@@ -44,6 +46,8 @@ app.use("/api/auth",Authrouter)
 app.use("/api/auth/admin",Adminauth);
 app.use("/api/admin",Adminrouter);
 app.use("/api/user",Userrouter);
+app.use("/api/affiliate",Affiliateroute);
+app.use("/api/master-affiliate",Masteraffiliateroute);
 app.use("/api",router);
 
 app.get("/",(req,res)=>{

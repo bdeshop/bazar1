@@ -9,6 +9,7 @@ const Terms = require("../models/Terms");
 const FAQ = require("../models/FAQ");
 const GameCategory=require("../models/GameCategory");
 const GameProvider = require("../models/GameProvider");
+const {User} = require("../models/User");
 // Middleware to check if user is authenticated as admin
 const adminAuth = (req, res, next) => {
   // Implement your authentication logic here
@@ -2273,7 +2274,7 @@ Adminrouter.put('/game-providers/order/update', async (req, res) => {
 });
 
 const Game = require('../models/Game');
-const User = require("../models/User");
+
 const Deposit = require("../models/Deposit");
 
 // Configure multer for game images
@@ -5167,6 +5168,10 @@ Adminrouter.get('/security-settings-stats', async (req, res) => {
 
 // Add this near the top with other requires
 const Event = require('../models/Event');
+const Affiliate = require("../models/Affiliate");
+const Payout = require("../models/Payout");
+const { create } = require("../models/MasterAffiliate");
+const Affilaitepayout = require("../models/Affilaitepayout");
 
 // Configure multer for event images
 const eventStorage = multer.diskStorage({
@@ -5437,4 +5442,1679 @@ Adminrouter.delete('/events/:id', async (req, res) => {
     });
   }
 });
+// GET all affiliates with filtering, pagination, and search
+Adminrouter.get('/affiliates', async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 10, 
+      status, 
+      verificationStatus,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+    
+    let filter = {};
+    
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+    
+    if (verificationStatus && verificationStatus !== 'all') {
+      filter.verificationStatus = verificationStatus;
+    }
+    
+    if (search) {
+      filter.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { affiliateCode: { $regex: search, $options: 'i' } },
+        { customAffiliateCode: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    // Calculate skip value for pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Sort configuration
+    const sort = {};
+    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    
+    // Get affiliates with pagination
+    const affiliates = await Affiliate.find(filter)
+      .sort({createdAt: -1})
+      .skip(skip)
+      .limit(parseInt(limit))
+      .select('-password -resetPasswordToken -resetPasswordExpires -emailVerificationToken');
+    
+    // Get total count for pagination info
+    const total = await Affiliate.countDocuments(filter);
+    
+    res.json({
+      affiliates,
+      totalPages: Math.ceil(total / parseInt(limit)),
+      currentPage: parseInt(page),
+      total
+    });
+  } catch (error) {
+    console.error('Error fetching affiliates:', error);
+    res.status(500).json({ error: 'Failed to fetch affiliates' });
+  }
+});
+
+// GET single affiliate by ID
+Adminrouter.get('/affiliates/:id', async (req, res) => {
+  try {
+    const affiliate = await Affiliate.findById(req.params.id)
+      .populate('referredUsers.user', 'username player_id email')
+      .populate('assignedManager', 'username fullName')
+      .select('-password -resetPasswordToken -resetPasswordExpires -emailVerificationToken');
+    
+    if (!affiliate) {
+      return res.status(404).json({ error: 'Affiliate not found' });
+    }
+    
+    res.json(affiliate);
+  } catch (error) {
+    console.error('Error fetching affiliate:', error);
+    res.status(500).json({ error: 'Failed to fetch affiliate' });
+  }
+});
+
+// POST create new affiliate (admin only)
+Adminrouter.post('/affiliates', async (req, res) => {
+  try {
+    const {
+      email,
+      password,
+      firstName,
+      lastName,
+      phone,
+      company,
+      website,
+      promoMethod,
+      commissionRate,
+      commissionType,
+      status
+    } = req.body;
+    
+    // Check if email already exists
+    const existingAffiliate = await Affiliate.findOne({ email });
+    if (existingAffiliate) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+    
+    const affiliateData = {
+      email,
+      password: password || Math.random().toString(36).slice(-8), // Generate random password if not provided
+      firstName,
+      lastName,
+      phone,
+      company,
+      website,
+      promoMethod: promoMethod || 'other',
+      commissionRate: commissionRate || 0.1,
+      commissionType: commissionType || 'revenue_share',
+      status: status || 'pending'
+    };
+    
+    const newAffiliate = new Affiliate(affiliateData);
+    const savedAffiliate = await newAffiliate.save();
+    
+    // Remove sensitive data before sending response
+    const affiliateResponse = savedAffiliate.toJSON();
+    
+    res.status(201).json({
+      message: 'Affiliate created successfully',
+      affiliate: affiliateResponse
+    });
+  } catch (error) {
+    console.error('Error creating affiliate:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ error: error.message });
+    }
+    res.status(500).json({ error: 'Failed to create affiliate' });
+  }
+});
+
+// PUT update affiliate
+Adminrouter.put('/affiliates/:id', async (req, res) => {
+  try {
+    const affiliate = await Affiliate.findById(req.params.id);
+    if (!affiliate) {
+      return res.status(404).json({ error: 'Affiliate not found' });
+    }
+    
+    const {
+      firstName,
+      lastName,
+      phone,
+      company,
+      website,
+      promoMethod,
+      commissionRate,
+      commissionType,
+      cpaRate,
+      depositRate,
+      status,
+      verificationStatus,
+      paymentMethod,
+      minimumPayout,
+      payoutSchedule,
+      autoPayout,
+      notes,
+      tags,
+      assignedManager
+    } = req.body;
+    
+    // Update fields
+    if (firstName) affiliate.firstName = firstName;
+    if (lastName) affiliate.lastName = lastName;
+    if (phone) affiliate.phone = phone;
+    if (company !== undefined) affiliate.company = company;
+    if (website !== undefined) affiliate.website = website;
+    if (promoMethod) affiliate.promoMethod = promoMethod;
+    if (commissionRate !== undefined) affiliate.commissionRate = commissionRate;
+    if (commissionType) affiliate.commissionType = commissionType;
+    if (cpaRate !== undefined) affiliate.cpaRate = cpaRate;
+    if (depositRate !== undefined) affiliate.depositRate = depositRate;
+    if (status) affiliate.status = status;
+    if (verificationStatus) affiliate.verificationStatus = verificationStatus;
+    if (paymentMethod) affiliate.paymentMethod = paymentMethod;
+    if (minimumPayout !== undefined) affiliate.minimumPayout = minimumPayout;
+    if (payoutSchedule) affiliate.payoutSchedule = payoutSchedule;
+    if (autoPayout !== undefined) affiliate.autoPayout = autoPayout;
+    if (notes !== undefined) affiliate.notes = notes;
+    if (tags !== undefined) affiliate.tags = tags;
+    if (assignedManager !== undefined) affiliate.assignedManager = assignedManager;
+    
+    await affiliate.save();
+    
+    // Remove sensitive data before sending response
+    const affiliateResponse = affiliate.toJSON();
+    
+    res.json({
+      message: 'Affiliate updated successfully',
+      affiliate: affiliateResponse
+    });
+  } catch (error) {
+    console.error('Error updating affiliate:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ error: error.message });
+    }
+    res.status(500).json({ error: 'Failed to update affiliate' });
+  }
+});
+
+// PUT update affiliate status
+Adminrouter.put('/affiliates/:id/status', async (req, res) => {
+  try {
+    const { status } = req.body;
+    
+    if (!status || !['pending', 'active', 'suspended', 'banned'].includes(status)) {
+      return res.status(400).json({ error: 'Valid status is required' });
+    }
+    
+    const affiliate = await Affiliate.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    ).select('-password -resetPasswordToken -resetPasswordExpires -emailVerificationToken');
+    
+    if (!affiliate) {
+      return res.status(404).json({ error: 'Affiliate not found' });
+    }
+    
+    res.json({
+      message: 'Affiliate status updated successfully',
+      affiliate
+    });
+  } catch (error) {
+    console.error('Error updating affiliate status:', error);
+    res.status(500).json({ error: 'Failed to update affiliate status' });
+  }
+});
+
+// PUT update affiliate verification status
+Adminrouter.put('/affiliates/:id/verification-status', async (req, res) => {
+  try {
+    const { verificationStatus } = req.body;
+    
+    if (!verificationStatus || !['unverified', 'pending', 'verified', 'rejected'].includes(verificationStatus)) {
+      return res.status(400).json({ error: 'Valid verification status is required' });
+    }
+    
+    const affiliate = await Affiliate.findByIdAndUpdate(
+      req.params.id,
+      { verificationStatus },
+      { new: true }
+    ).select('-password -resetPasswordToken -resetPasswordExpires -emailVerificationToken');
+    
+    if (!affiliate) {
+      return res.status(404).json({ error: 'Affiliate not found' });
+    }
+    
+    res.json({
+      message: 'Affiliate verification status updated successfully',
+      affiliate
+    });
+  } catch (error) {
+    console.error('Error updating affiliate verification status:', error);
+    res.status(500).json({ error: 'Failed to update affiliate verification status' });
+  }
+});
+
+// PUT update affiliate commission structure
+Adminrouter.put('/affiliates/:id/commission', async (req, res) => {
+  try {
+    const { commissionRate, commissionType, cpaRate, depositRate } = req.body;
+    
+    const affiliate = await Affiliate.findById(req.params.id);
+    if (!affiliate) {
+      return res.status(404).json({ error: 'Affiliate not found' });
+    }
+    
+    if (commissionRate !== undefined) {
+      if (commissionRate < 0.01 || commissionRate > 0.5) {
+        return res.status(400).json({ error: 'Commission rate must be between 1% and 50%' });
+      }
+      affiliate.commissionRate = commissionRate;
+    }
+    
+    if (depositRate !== undefined) {
+      if (depositRate < 0 || depositRate > 0.5) {
+        return res.status(400).json({ error: 'Deposit rate must be between 0% and 50%' });
+      }
+      affiliate.depositRate = depositRate;
+    }
+    
+    if (commissionType) {
+      affiliate.commissionType = commissionType;
+    }
+    
+    if (cpaRate !== undefined) {
+      if (cpaRate < 0) {
+        return res.status(400).json({ error: 'CPA rate cannot be negative' });
+      }
+      affiliate.cpaRate = cpaRate;
+    }
+    
+    await affiliate.save();
+    
+    res.json({
+      message: 'Affiliate commission structure updated successfully',
+      affiliate: {
+        commissionRate: affiliate.commissionRate,
+        depositRate: affiliate.depositRate,
+        commissionType: affiliate.commissionType,
+        cpaRate: affiliate.cpaRate
+      }
+    });
+  } catch (error) {
+    console.error('Error updating affiliate commission:', error);
+    res.status(500).json({ error: 'Failed to update affiliate commission structure' });
+  }
+});
+
+// PUT update affiliate payment information
+Adminrouter.put('/affiliates/:id/payment', async (req, res) => {
+  try {
+    const { paymentMethod, paymentDetails, minimumPayout, payoutSchedule, autoPayout } = req.body;
+    
+    const affiliate = await Affiliate.findById(req.params.id);
+    if (!affiliate) {
+      return res.status(404).json({ error: 'Affiliate not found' });
+    }
+    
+    if (paymentMethod) {
+      affiliate.paymentMethod = paymentMethod;
+    }
+    
+    if (paymentDetails) {
+      // Update specific payment details based on payment method
+      if (paymentDetails.bkash) {
+        affiliate.paymentDetails.bkash = {
+          ...affiliate.paymentDetails.bkash,
+          ...paymentDetails.bkash
+        };
+      }
+      if (paymentDetails.nagad) {
+        affiliate.paymentDetails.nagad = {
+          ...affiliate.paymentDetails.nagad,
+          ...paymentDetails.nagad
+        };
+      }
+      if (paymentDetails.rocket) {
+        affiliate.paymentDetails.rocket = {
+          ...affiliate.paymentDetails.rocket,
+          ...paymentDetails.rocket
+        };
+      }
+      if (paymentDetails.binance) {
+        affiliate.paymentDetails.binance = {
+          ...affiliate.paymentDetails.binance,
+          ...paymentDetails.binance
+        };
+      }
+      if (paymentDetails.bank_transfer) {
+        affiliate.paymentDetails.bank_transfer = {
+          ...affiliate.paymentDetails.bank_transfer,
+          ...paymentDetails.bank_transfer
+        };
+      }
+    }
+    
+    if (minimumPayout !== undefined) {
+      affiliate.minimumPayout = minimumPayout;
+    }
+    
+    if (payoutSchedule) {
+      affiliate.payoutSchedule = payoutSchedule;
+    }
+    
+    if (autoPayout !== undefined) {
+      affiliate.autoPayout = autoPayout;
+    }
+    
+    await affiliate.save();
+    
+    res.json({
+      message: 'Affiliate payment information updated successfully',
+      affiliate: {
+        paymentMethod: affiliate.paymentMethod,
+        formattedPaymentDetails: affiliate.formattedPaymentDetails,
+        minimumPayout: affiliate.minimumPayout,
+        payoutSchedule: affiliate.payoutSchedule,
+        autoPayout: affiliate.autoPayout
+      }
+    });
+  } catch (error) {
+    console.error('Error updating affiliate payment information:', error);
+    res.status(500).json({ error: 'Failed to update affiliate payment information' });
+  }
+});
+
+// DELETE affiliate
+Adminrouter.delete('/affiliates/:id', async (req, res) => {
+  try {
+    const affiliate = await Affiliate.findById(req.params.id);
+    
+    if (!affiliate) {
+      return res.status(404).json({ error: 'Affiliate not found' });
+    }
+    
+    await Affiliate.findByIdAndDelete(req.params.id);
+    
+    res.json({ message: 'Affiliate deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting affiliate:', error);
+    res.status(500).json({ error: 'Failed to delete affiliate' });
+  }
+});
+
+// ==================== COMMISSION STRUCTURE ROUTES ====================
+
+// GET commission structure settings
+Adminrouter.get('/affiliates/commission-structure', async (req, res) => {
+  try {
+    // Get default commission structure from settings or return default values
+    const defaultCommission = {
+      revenue_share: {
+        defaultRate: 0.1,
+        minRate: 0.01,
+        maxRate: 0.5
+      },
+      cpa: {
+        defaultRate: 0,
+        minRate: 0,
+        maxRate: 1000
+      },
+      hybrid: {
+        revenueShareRate: 0.05,
+        cpaRate: 50
+      },
+      tiers: [
+        {
+          level: 1,
+          name: 'Bronze',
+          minReferrals: 0,
+          commissionRate: 0.1
+        },
+        {
+          level: 2,
+          name: 'Silver',
+          minReferrals: 10,
+          commissionRate: 0.15
+        },
+        {
+          level: 3,
+          name: 'Gold',
+          minReferrals: 25,
+          commissionRate: 0.2
+        },
+        {
+          level: 4,
+          name: 'Platinum',
+          minReferrals: 50,
+          commissionRate: 0.25
+        }
+      ]
+    };
+    
+    res.json(defaultCommission);
+  } catch (error) {
+    console.error('Error fetching commission structure:', error);
+    res.status(500).json({ error: 'Failed to fetch commission structure' });
+  }
+});
+
+// PUT update commission structure
+Adminrouter.put('/affiliates/commission-structure', async (req, res) => {
+  try {
+    const { revenue_share, cpa, hybrid, tiers } = req.body;
+    
+    // Here you would typically save this to a settings collection
+    // For now, we'll just return the updated structure
+    
+    const updatedStructure = {
+      revenue_share: revenue_share || {
+        defaultRate: 0.1,
+        minRate: 0.01,
+        maxRate: 0.5
+      },
+      cpa: cpa || {
+        defaultRate: 0,
+        minRate: 0,
+        maxRate: 1000
+      },
+      hybrid: hybrid || {
+        revenueShareRate: 0.05,
+        cpaRate: 50
+      },
+      tiers: tiers || [
+        {
+          level: 1,
+          name: 'Bronze',
+          minReferrals: 0,
+          commissionRate: 0.1
+        }
+      ]
+    };
+    
+    res.json({
+      message: 'Commission structure updated successfully',
+      commissionStructure: updatedStructure
+    });
+  } catch (error) {
+    console.error('Error updating commission structure:', error);
+    res.status(500).json({ error: 'Failed to update commission structure' });
+  }
+});
+
+// ==================== PAYOUT MANAGEMENT ROUTES ====================
+
+// GET all payouts with filtering and pagination
+Adminrouter.get('/affiliates/payouts', async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 10, 
+      status, 
+      paymentMethod,
+      affiliateId,
+      startDate,
+      endDate,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+    
+    let filter = {};
+    
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+    
+    if (paymentMethod && paymentMethod !== 'all') {
+      filter.paymentMethod = paymentMethod;
+    }
+    
+    if (affiliateId) {
+      filter.affiliate = affiliateId;
+    }
+    
+    // Date range filter
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) filter.createdAt.$lte = new Date(endDate);
+    }
+    
+    // Calculate skip value for pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Sort configuration
+    const sort = {};
+    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    
+    // Get payouts with pagination
+    const payouts = await Payout.find(filter)
+      .populate('affiliate', 'firstName lastName email affiliateCode')
+      .sort(sort)
+      .skip(skip)
+      .limit(parseInt(limit));
+    
+    // Get total count for pagination info
+    const total = await Payout.countDocuments(filter);
+    
+    // Get summary statistics
+    const totalAmount = await Payout.aggregate([
+      { $match: filter },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    
+    const statusCounts = await Payout.aggregate([
+      { $match: filter },
+      { $group: { _id: '$status', count: { $sum: 1 }, amount: { $sum: '$amount' } } }
+    ]);
+    
+    res.json({
+      payouts,
+      totalPages: Math.ceil(total / parseInt(limit)),
+      currentPage: parseInt(page),
+      total,
+      totalAmount: totalAmount.length > 0 ? totalAmount[0].total : 0,
+      statusCounts
+    });
+  } catch (error) {
+    console.error('Error fetching payouts:', error);
+    res.status(500).json({ error: 'Failed to fetch payouts' });
+  }
+});
+
+// POST create manual payout
+Adminrouter.post('/affiliates/payouts/manual', async (req, res) => {
+  try {
+    const { affiliateId, amount, notes } = req.body;
+    
+    if (!affiliateId || !amount || amount <= 0) {
+      return res.status(400).json({ error: 'Valid affiliate ID and amount are required' });
+    }
+    
+    const affiliate = await Affiliate.findById(affiliateId);
+    if (!affiliate) {
+      return res.status(404).json({ error: 'Affiliate not found' });
+    }
+    
+    if (amount > affiliate.pendingEarnings) {
+      return res.status(400).json({ error: 'Payout amount exceeds pending earnings' });
+    }
+    
+    if (amount < affiliate.minimumPayout) {
+      return res.status(400).json({ 
+        error: `Payout amount must be at least ${affiliate.minimumPayout}` 
+      });
+    }
+    
+    // Process payout using the affiliate method
+    await affiliate.processPayout(amount, `MANUAL-${Date.now()}`);
+    
+    res.json({
+      message: 'Manual payout processed successfully',
+      payout: {
+        affiliate: affiliate._id,
+        amount,
+        paymentMethod: affiliate.paymentMethod,
+        status: 'completed'
+      }
+    });
+  } catch (error) {
+    console.error('Error creating manual payout:', error);
+    res.status(500).json({ error: 'Failed to create manual payout' });
+  }
+});
+
+// PUT update payout status
+Adminrouter.put('/affiliates/payouts/:id/status', async (req, res) => {
+  try {
+    const { status, transactionId, adminNotes } = req.body;
+    
+    if (!status || !['pending', 'processing', 'completed', 'failed', 'cancelled'].includes(status)) {
+      return res.status(400).json({ error: 'Valid status is required' });
+    }
+    
+    const payout = await Payout.findById(req.params.id);
+    if (!payout) {
+      return res.status(404).json({ error: 'Payout not found' });
+    }
+    
+    payout.status = status;
+    if (transactionId) payout.transactionId = transactionId;
+    if (adminNotes) payout.adminNotes = adminNotes;
+    
+    if (status === 'completed' || status === 'failed') {
+      payout.processedAt = new Date();
+    }
+    
+    await payout.save();
+    
+    res.json({
+      message: 'Payout status updated successfully',
+      payout
+    });
+  } catch (error) {
+    console.error('Error updating payout status:', error);
+    res.status(500).json({ error: 'Failed to update payout status' });
+  }
+});
+
+// ==================== REFERRAL TRACKING ROUTES ====================
+
+// GET referral tracking data
+Adminrouter.get('/affiliates/referral-tracking', async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 10, 
+      affiliateId,
+      startDate,
+      endDate,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+    
+    let filter = {};
+    
+    if (affiliateId) {
+      filter.affiliate = affiliateId;
+    }
+    
+    // Date range filter
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) filter.createdAt.$lte = new Date(endDate);
+    }
+    
+    // Calculate skip value for pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Sort configuration
+    const sort = {};
+    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    
+    // Get earnings records (which track referrals)
+    const referrals = await Earnings.find(filter)
+      .populate('affiliate', 'firstName lastName affiliateCode')
+      .populate('referredUser', 'username player_id email')
+      .sort(sort)
+      .skip(skip)
+      .limit(parseInt(limit));
+    
+    // Get total count for pagination info
+    const total = await Earnings.countDocuments(filter);
+    
+    res.json({
+      referrals,
+      totalPages: Math.ceil(total / parseInt(limit)),
+      currentPage: parseInt(page),
+      total
+    });
+  } catch (error) {
+    console.error('Error fetching referral tracking data:', error);
+    res.status(500).json({ error: 'Failed to fetch referral tracking data' });
+  }
+});
+
+// GET click tracking data
+Adminrouter.get('/affiliates/click-tracking', async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 10, 
+      affiliateId,
+      startDate,
+      endDate
+    } = req.query;
+    
+    let filter = {};
+    
+    if (affiliateId) {
+      filter._id = affiliateId;
+    }
+    
+    // For click tracking, we'll get affiliates with their click counts
+    const affiliates = await Affiliate.find(filter)
+      .select('firstName lastName email affiliateCode clickCount conversionRate')
+      .sort({ clickCount: -1 })
+      .skip((parseInt(page) - 1) * parseInt(limit))
+      .limit(parseInt(limit));
+    
+    // Get total count for pagination info
+    const total = await Affiliate.countDocuments(filter);
+    
+    res.json({
+      affiliates,
+      totalPages: Math.ceil(total / parseInt(limit)),
+      currentPage: parseInt(page),
+      total
+    });
+  } catch (error) {
+    console.error('Error fetching click tracking data:', error);
+    res.status(500).json({ error: 'Failed to fetch click tracking data' });
+  }
+});
+
+// ==================== PERFORMANCE REPORTS ROUTES ====================
+
+// GET affiliate performance reports
+Adminrouter.get('/affiliates/performance-reports', async (req, res) => {
+  try {
+    const { 
+      period = 'month', // day, week, month, year
+      startDate,
+      endDate,
+      affiliateId
+    } = req.query;
+    
+    let dateFilter = {};
+    if (startDate || endDate) {
+      dateFilter.createdAt = {};
+      if (startDate) dateFilter.createdAt.$gte = new Date(startDate);
+      if (endDate) dateFilter.createdAt.$lte = new Date(endDate);
+    }
+    
+    let affiliateFilter = {};
+    if (affiliateId) {
+      affiliateFilter._id = affiliateId;
+    }
+    
+    // Get overall affiliate stats
+    const overallStats = await Affiliate.getStats();
+    
+    // Get top performers
+    const topPerformers = await Affiliate.getTopPerformers(10);
+    
+    // Get performance trends
+    const performanceTrends = await Earnings.aggregate([
+      {
+        $match: {
+          ...dateFilter,
+          status: 'completed'
+        }
+      },
+      {
+        $group: {
+          _id: {
+            affiliate: '$affiliate',
+            period: {
+              $dateToString: {
+                format: period === 'day' ? '%Y-%m-%d' : 
+                       period === 'week' ? '%Y-%U' : 
+                       period === 'month' ? '%Y-%m' : '%Y',
+                date: '$createdAt'
+              }
+            }
+          },
+          totalEarnings: { $sum: '$amount' },
+          referralCount: { $sum: 1 }
+        }
+      },
+      {
+        $lookup: {
+          from: 'affiliates',
+          localField: '_id.affiliate',
+          foreignField: '_id',
+          as: 'affiliateInfo'
+        }
+      },
+      {
+        $unwind: '$affiliateInfo'
+      },
+      {
+        $project: {
+          period: '$_id.period',
+          affiliateName: { $concat: ['$affiliateInfo.firstName', ' ', '$affiliateInfo.lastName'] },
+          affiliateCode: '$affiliateInfo.affiliateCode',
+          totalEarnings: 1,
+          referralCount: 1
+        }
+      },
+      { $sort: { period: 1, totalEarnings: -1 } }
+    ]);
+    
+    res.json({
+      overallStats,
+      topPerformers,
+      performanceTrends,
+      period
+    });
+  } catch (error) {
+    console.error('Error generating performance reports:', error);
+    res.status(500).json({ error: 'Failed to generate performance reports' });
+  }
+});
+
+// GET individual affiliate performance report
+Adminrouter.get('/affiliates/:id/performance-report', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { period = 'month', startDate, endDate } = req.query;
+    
+    const affiliate = await Affiliate.findById(id)
+      .select('-password -resetPasswordToken -resetPasswordExpires -emailVerificationToken');
+    
+    if (!affiliate) {
+      return res.status(404).json({ error: 'Affiliate not found' });
+    }
+    
+    let dateFilter = {};
+    if (startDate || endDate) {
+      dateFilter.createdAt = {};
+      if (startDate) dateFilter.createdAt.$gte = new Date(startDate);
+      if (endDate) dateFilter.createdAt.$lte = new Date(endDate);
+    }
+    
+    // Get earnings history for the affiliate
+    const earningsHistory = await Earnings.aggregate([
+      {
+        $match: {
+          affiliate: affiliate._id,
+          ...dateFilter
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: period === 'day' ? '%Y-%m-%d' : 
+                     period === 'week' ? '%Y-%U' : 
+                     period === 'month' ? '%Y-%m' : '%Y',
+              date: '$createdAt'
+            }
+          },
+          totalEarnings: { $sum: '$amount' },
+          completedEarnings: {
+            $sum: { $cond: [{ $eq: ['$status', 'completed'] }, '$amount', 0] }
+          },
+          pendingEarnings: {
+            $sum: { $cond: [{ $eq: ['$status', 'pending'] }, '$amount', 0] }
+          },
+          referralCount: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+    
+    // Get referral details
+    const referralDetails = await Earnings.find({
+      affiliate: affiliate._id,
+      ...dateFilter
+    })
+      .populate('referredUser', 'username player_id email createdAt')
+      .sort({ createdAt: -1 })
+      .limit(50);
+    
+    res.json({
+      affiliate,
+      earningsHistory,
+      referralDetails,
+      performanceMetrics: {
+        conversionRate: affiliate.conversionRate,
+        averageEarningPerReferral: affiliate.averageEarningPerReferral,
+        clickCount: affiliate.clickCount,
+        earningsThisMonth: affiliate.earningsThisMonth
+      }
+    });
+  } catch (error) {
+    console.error('Error generating affiliate performance report:', error);
+    res.status(500).json({ error: 'Failed to generate affiliate performance report' });
+  }
+});
+
+// ==================== MARKETING MATERIALS ROUTES ====================
+
+// GET marketing materials
+Adminrouter.get('/affiliates/marketing-materials', async (req, res) => {
+  try {
+    // This would typically come from a MarketingMaterials model
+    const marketingMaterials = {
+      banners: [
+        {
+          id: 1,
+          name: 'Leaderboard Banner',
+          size: '728x90',
+          formats: ['PNG', 'JPG'],
+          downloadUrl: '/api/affiliates/marketing-materials/banners/leaderboard'
+        },
+        {
+          id: 2,
+          name: 'Square Banner',
+          size: '250x250',
+          formats: ['PNG', 'JPG'],
+          downloadUrl: '/api/affiliates/marketing-materials/banners/square'
+        },
+        {
+          id: 3,
+          name: 'Skyscraper Banner',
+          size: '160x600',
+          formats: ['PNG', 'JPG'],
+          downloadUrl: '/api/affiliates/marketing-materials/banners/skyscraper'
+        }
+      ],
+      links: [
+        {
+          id: 1,
+          type: 'Registration Link',
+          url: 'https://yoursite.com/register?ref={affiliate_code}',
+          description: 'Direct registration link with affiliate tracking'
+        },
+        {
+          id: 2,
+          type: 'Promotional Link',
+          url: 'https://yoursite.com/promo?ref={affiliate_code}',
+          description: 'Promotional page with bonus offers'
+        }
+      ],
+      textAds: [
+        {
+          id: 1,
+          title: 'Join Our Platform Today!',
+          description: 'Experience the best gaming platform with amazing rewards. Sign up now!',
+          trackingUrl: 'https://yoursite.com/register?ref={affiliate_code}'
+        }
+      ],
+      socialMedia: {
+        facebook: {
+          template: `Join our amazing platform and get exclusive rewards!
+          
+Sign up now: https://yoursite.com/register?ref={affiliate_code}
+          
+#Gaming #Rewards #Exclusive`,
+          imageFormats: ['Square', 'Story']
+        },
+        twitter: {
+          template: `🎮 Join the ultimate gaming experience! 
+          
+Sign up now and claim your bonus: https://yoursite.com/register?ref={affiliate_code}
+          
+#Gaming #Bonus #JoinNow`,
+          imageFormats: ['Banner', 'Square']
+        }
+      }
+    };
+    
+    res.json(marketingMaterials);
+  } catch (error) {
+    console.error('Error fetching marketing materials:', error);
+    res.status(500).json({ error: 'Failed to fetch marketing materials' });
+  }
+});
+
+// POST generate custom affiliate link
+Adminrouter.post('/affiliates/generate-link', async (req, res) => {
+  try {
+    const { affiliateId, linkType, customParameters } = req.body;
+    
+    const affiliate = await Affiliate.findById(affiliateId);
+    if (!affiliate) {
+      return res.status(404).json({ error: 'Affiliate not found' });
+    }
+    
+    const baseUrl = 'https://yoursite.com';
+    let generatedLink = '';
+    
+    switch (linkType) {
+      case 'registration':
+        generatedLink = `${baseUrl}/register?ref=${affiliate.affiliateCode}`;
+        break;
+      case 'promotional':
+        generatedLink = `${baseUrl}/promo?ref=${affiliate.affiliateCode}`;
+        break;
+      case 'custom':
+        generatedLink = `${baseUrl}${customParameters}?ref=${affiliate.affiliateCode}`;
+        break;
+      default:
+        generatedLink = `${baseUrl}/?ref=${affiliate.affiliateCode}`;
+    }
+    
+    res.json({
+      message: 'Affiliate link generated successfully',
+      link: generatedLink,
+      affiliateCode: affiliate.affiliateCode
+    });
+  } catch (error) {
+    console.error('Error generating affiliate link:', error);
+    res.status(500).json({ error: 'Failed to generate affiliate link' });
+  }
+});
+
+// ==================== AFFILIATE STATISTICS ROUTES ====================
+
+// GET affiliate dashboard statistics
+Adminrouter.get('/affiliates/dashboard/stats', async (req, res) => {
+  try {
+    const totalAffiliates = await Affiliate.countDocuments();
+    const activeAffiliates = await Affiliate.countDocuments({ status: 'active' });
+    const pendingAffiliates = await Affiliate.countDocuments({ status: 'pending' });
+    const suspendedAffiliates = await Affiliate.countDocuments({ status: 'suspended' });
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const newAffiliatesToday = await Affiliate.countDocuments({
+      createdAt: { $gte: today }
+    });
+    
+    // Get overall stats from the static method
+    const overallStats = await Affiliate.getStats();
+    
+    // Get pending payouts total
+    const pendingPayouts = await Affiliate.aggregate([
+      { $match: { status: 'active' } },
+      {
+        $group: {
+          _id: null,
+          totalPending: { $sum: '$pendingEarnings' }
+        }
+      }
+    ]);
+    
+    // Get affiliate registration trend for last 7 days
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+    
+    const registrationTrend = await Affiliate.aggregate([
+      { 
+        $match: { 
+          createdAt: { $gte: sevenDaysAgo } 
+        } 
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+    
+    res.json({
+      summary: {
+        totalAffiliates,
+        activeAffiliates,
+        pendingAffiliates,
+        suspendedAffiliates,
+        newAffiliatesToday
+      },
+      financial: {
+        ...overallStats,
+        pendingPayouts: pendingPayouts.length > 0 ? pendingPayouts[0].totalPending : 0
+      },
+      registrationTrend
+    });
+  } catch (error) {
+    console.error('Error fetching affiliate dashboard stats:', error);
+    res.status(500).json({ error: 'Failed to fetch affiliate dashboard statistics' });
+  }
+});
+
+// GET recent affiliate activities
+Adminrouter.get('/affiliates/recent-activities', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    
+    // Get recent affiliates
+    const recentAffiliates = await Affiliate.find()
+      .select('firstName lastName email status createdAt')
+      .sort({ createdAt: -1 })
+      .limit(limit);
+    
+    // Get recent payouts
+    const recentPayouts = await Payout.find()
+      .populate('affiliate', 'firstName lastName')
+      .sort({ createdAt: -1 })
+      .limit(limit);
+    
+    // Get recent earnings
+    const recentEarnings = await Earnings.find()
+      .populate('affiliate', 'firstName lastName')
+      .populate('referredUser', 'username')
+      .sort({ createdAt: -1 })
+      .limit(limit);
+    
+    res.json({
+      recentAffiliates,
+      recentPayouts,
+      recentEarnings
+    });
+  } catch (error) {
+    console.error('Error fetching recent activities:', error);
+    res.status(500).json({ error: 'Failed to fetch recent activities' });
+  }
+});
+// ==================== ADMIN PAYOUT ROUTES ====================
+
+// Get all payout requests (Admin)
+Adminrouter.get("/payouts", async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status, paymentMethod, startDate, endDate } = req.query;
+    
+    const query = {};
+    if (status) query.status = status;
+    if (paymentMethod) query.paymentMethod = paymentMethod;
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) query.createdAt.$gte = new Date(startDate);
+      if (endDate) query.createdAt.$lte = new Date(endDate);
+    }
+
+    const payouts = await Payout.find(query)
+      .populate('affiliate', 'firstName lastName email affiliateCode')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Payout.countDocuments(query);
+
+    // Payout statistics for admin
+    const stats = await Payout.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          totalAmount: { $sum: '$amount' }
+        }
+      }
+    ]);
+
+    res.json({
+      success: true,
+      payouts,
+      stats,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error("Admin get payouts error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+
+// Process payout (Admin)
+Adminrouter.post("/payouts/:id/process", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { transactionId, processorNotes, estimatedCompletionDate } = req.body;
+
+    const payout = await Payout.findById(id).populate('affiliate');
+    if (!payout) {
+      return res.status(404).json({
+        success: false,
+        message: "Payout not found"
+      });
+    }
+
+    if (payout.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: "Only pending payouts can be processed"
+      });
+    }
+
+    // Update payout status to processing
+    await payout.updateStatus('processing', processorNotes, req.user._id);
+
+    // Set transaction ID and estimated completion date
+    if (transactionId) {
+      const paymentDetails = payout.paymentDetails;
+      switch (payout.paymentMethod) {
+        case 'bkash':
+        case 'nagad':
+        case 'rocket':
+          paymentDetails[payout.paymentMethod].transactionId = transactionId;
+          break;
+        case 'binance':
+        case 'crypto':
+          paymentDetails[payout.paymentMethod].transactionHash = transactionId;
+          break;
+        case 'bank_transfer':
+          paymentDetails.bank_transfer.referenceNumber = transactionId;
+          break;
+      }
+      payout.paymentDetails = paymentDetails;
+    }
+
+    if (estimatedCompletionDate) {
+      payout.estimatedCompletionDate = new Date(estimatedCompletionDate);
+    }
+
+    await payout.save();
+
+    res.json({
+      success: true,
+      message: "Payout is now being processed",
+      payout: {
+        id: payout._id,
+        status: payout.status,
+        processedAt: payout.processedAt,
+        estimatedCompletionDate: payout.estimatedCompletionDate
+      }
+    });
+  } catch (error) {
+    console.error("Admin process payout error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+
+// Complete payout (Admin)
+Adminrouter.post("/payouts/:id/complete", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { finalAmount, fees, processorNotes } = req.body;
+
+    const payout = await Payout.findById(id).populate('affiliate');
+    if (!payout) {
+      return res.status(404).json({
+        success: false,
+        message: "Payout not found"
+      });
+    }
+
+    if (payout.status !== 'processing') {
+      return res.status(400).json({
+        success: false,
+        message: "Only processing payouts can be completed"
+      });
+    }
+
+    // Update fees and net amount if provided
+    if (fees) {
+      payout.fees = { ...payout.fees, ...fees };
+      payout.netAmount = payout.amount - payout.totalFees;
+    }
+
+    if (finalAmount && finalAmount !== payout.amount) {
+      payout.amount = finalAmount;
+      payout.netAmount = finalAmount - payout.totalFees;
+    }
+
+    // Update payout status to completed
+    await payout.updateStatus('completed', processorNotes, req.user._id);
+
+    // Update affiliate's earnings and create transaction records
+    const affiliate = payout.affiliate;
+    
+    // Mark earnings as paid
+    for (let earning of payout.includedEarnings) {
+      const earningRecord = affiliate.earningsHistory.id(earning.earningId);
+      if (earningRecord) {
+        earningRecord.status = 'paid';
+        earningRecord.paidAt = new Date();
+        earningRecord.payoutId = payout._id;
+      }
+    }
+
+    // Update affiliate totals
+    affiliate.paidEarnings += payout.netAmount;
+    affiliate.lastPayoutDate = new Date();
+    await affiliate.save();
+
+    // Send notification to affiliate
+    await payout.markAsNotified('affiliate');
+
+    res.json({
+      success: true,
+      message: "Payout completed successfully",
+      payout: {
+        id: payout._id,
+        status: payout.status,
+        completedAt: payout.completedAt,
+        netAmount: payout.netAmount
+      }
+    });
+  } catch (error) {
+    console.error("Admin complete payout error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+
+// Reject payout (Admin)
+Adminrouter.post("/payouts/:id/reject", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason, failureReason } = req.body;
+
+    const payout = await Payout.findById(id).populate('affiliate');
+    if (!payout) {
+      return res.status(404).json({
+        success: false,
+        message: "Payout not found"
+      });
+    }
+
+    if (!['pending', 'processing'].includes(payout.status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Only pending or processing payouts can be rejected"
+      });
+    }
+
+    // Update payout status to failed
+    await payout.updateStatus('failed', reason, req.user._id);
+    
+    if (failureReason) {
+      payout.failureReason = failureReason;
+      payout.failureDetails = reason;
+    }
+
+    await payout.save();
+
+    // Restore affiliate's pending earnings
+    const affiliate = payout.affiliate;
+    for (let earning of payout.includedEarnings) {
+      const earningRecord = affiliate.earningsHistory.id(earning.earningId);
+      if (earningRecord) {
+        earningRecord.status = 'pending';
+        earningRecord.payoutId = undefined;
+      }
+    }
+
+    affiliate.pendingEarnings += payout.amount;
+    await affiliate.save();
+
+    res.json({
+      success: true,
+      message: "Payout rejected successfully"
+    });
+  } catch (error) {
+    console.error("Admin reject payout error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+
+// Retry failed payout (Admin)
+Adminrouter.post("/payouts/:id/retry", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+
+    const payout = await Payout.findById(id);
+    if (!payout) {
+      return res.status(404).json({
+        success: false,
+        message: "Payout not found"
+      });
+    }
+
+    if (!payout.canRetry()) {
+      return res.status(400).json({
+        success: false,
+        message: "Payout cannot be retried"
+      });
+    }
+
+    await payout.retry(notes);
+
+    res.json({
+      success: true,
+      message: "Payout retry initiated successfully",
+      payout: {
+        id: payout._id,
+        status: payout.status,
+        retryAttempt: payout.retryAttempt
+      }
+    });
+  } catch (error) {
+    console.error("Admin retry payout error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+
+// Helper function to calculate next payout date
+function calculateNextPayoutDate(payoutSchedule) {
+  const now = new Date();
+  
+  switch (payoutSchedule) {
+    case 'weekly':
+      return new Date(now.setDate(now.getDate() + 7));
+    case 'bi_weekly':
+      return new Date(now.setDate(now.getDate() + 14));
+    case 'monthly':
+      return new Date(now.setMonth(now.getMonth() + 1));
+    default:
+      return null;
+  }
+}
+// ==================== AFFILIATE PAYOUT ROUTES ====================
+
+// POST create or update affiliate payout configuration
+Adminrouter.post('/affiliate-payouts', async (req, res) => {
+  try {
+    const { affilaiteamount, masteraffiliateamount } = req.body;
+
+    // Validation
+    if (!affilaiteamount || affilaiteamount < 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid affiliate amount is required and must be non-negative'
+      });
+    }
+
+    if (!masteraffiliateamount || masteraffiliateamount < 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid master affiliate amount is required and must be non-negative'
+      });
+    }
+
+    // Check if payout configuration already exists
+    const existingPayout = await Affilaitepayout.findOne();
+    
+    let payout;
+    let message;
+
+    if (existingPayout) {
+      // Update existing payout configuration
+      existingPayout.affilaiteamount = parseFloat(affilaiteamount);
+      existingPayout.masteraffiliateamount = parseFloat(masteraffiliateamount);
+      payout = await existingPayout.save();
+      message = 'Affiliate payout configuration updated successfully';
+    } else {
+      // Create new payout configuration
+      const payoutData = {
+        affilaiteamount: parseFloat(affilaiteamount),
+        masteraffiliateamount: parseFloat(masteraffiliateamount)
+      };
+      payout = new Affilaitepayout(payoutData);
+      await payout.save();
+      message = 'Affiliate payout configuration created successfully';
+    }
+
+    res.status(200).json({
+      success: true,
+      message: message,
+      data: payout
+    });
+  } catch (error) {
+    console.error('Error creating/updating affiliate payout:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create/update affiliate payout configuration'
+    });
+  }
+});
+
+// GET current affiliate payout configuration
+Adminrouter.get('/affiliate-payouts', async (req, res) => {
+  try {
+    const payout = await Affilaitepayout.findOne();
+    
+    if (!payout) {
+      return res.json({
+        error: 'No affiliate payout configuration found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: payout
+    });
+  } catch (error) {
+    console.error('Error fetching affiliate payout:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch affiliate payout configuration'
+    });
+  }
+});
+// Get all master affiliates created by a specific super affiliate
+Adminrouter.get("/all-master-affiliate/:id", async (req, res) => {
+  try {
+    const masterAffiliates = await MasterAffiliate.find({ 
+      createdBy: req.params.id,
+      role: 'master_affiliate'
+    }).select('-password -resetPasswordToken -resetPasswordExpires -emailVerificationToken');
+
+
+    res.json({
+      success: true,
+      count: masterAffiliates.length,
+      data: masterAffiliates
+    });
+  } catch (error) {
+    console.error("Error fetching master affiliates:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+// PUT update affiliate payout configuration
+Adminrouter.put('/affiliate-payouts', async (req, res) => {
+  try {
+    const { affilaiteamount, masteraffiliateamount } = req.body;
+
+    // Validation
+    if (affilaiteamount === undefined && masteraffiliateamount === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'At least one field (affilaiteamount or masteraffiliateamount) is required for update'
+      });
+    }
+
+    if (affilaiteamount !== undefined && affilaiteamount < 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Affiliate amount must be non-negative'
+      });
+    }
+
+    if (masteraffiliateamount !== undefined && masteraffiliateamount < 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Master affiliate amount must be non-negative'
+      });
+    }
+
+    const payout = await Affilaitepayout.findOne();
+    
+    if (!payout) {
+      return res.status(404).json({
+        success: false,
+        error: 'No affiliate payout configuration found to update'
+      });
+    }
+
+    // Update fields
+    if (affilaiteamount !== undefined) {
+      payout.affilaiteamount = parseFloat(affilaiteamount);
+    }
+    
+    if (masteraffiliateamount !== undefined) {
+      payout.masteraffiliateamount = parseFloat(masteraffiliateamount);
+    }
+
+    await payout.save();
+
+    res.json({
+      success: true,
+      message: 'Affiliate payout configuration updated successfully',
+      data: payout
+    });
+  } catch (error) {
+    console.error('Error updating affiliate payout:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update affiliate payout configuration'
+    });
+  }
+});
+
+// DELETE affiliate payout configuration
+Adminrouter.delete('/affiliate-payouts', async (req, res) => {
+  try {
+    const payout = await Affilaitepayout.findOne();
+    
+    if (!payout) {
+      return res.status(404).json({
+        success: false,
+        error: 'No affiliate payout configuration found to delete'
+      });
+    }
+
+    await Affilaitepayout.deleteOne({ _id: payout._id });
+
+    res.json({
+      success: true,
+      message: 'Affiliate payout configuration deleted successfully',
+      data: {
+        id: payout._id,
+        affilaiteamount: payout.affilaiteamount,
+        masteraffiliateamount: payout.masteraffiliateamount
+      }
+    });
+  } catch (error) {
+    console.error('Error deleting affiliate payout:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete affiliate payout configuration'
+    });
+  }
+});
+
+
 module.exports = Adminrouter;

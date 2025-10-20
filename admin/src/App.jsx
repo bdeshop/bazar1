@@ -37,6 +37,10 @@ import Securitysettings from './pages/loginlogs/Securitysettings'
 import Devicemanagement from './pages/loginlogs/Devicemanagement'
 import Event from './pages/event/Event'
 import Allevent from './pages/event/Allevent'
+import Allaffiliates from './pages/allaffiliates/Allaffiliates'
+import Payout from './pages/payout/Payout'
+import Affiliatepayout from './pages/affiliatepayout/Affiliatepayout'
+import Affilaitedetails from './pages/allaffiliates/Affilaitedetails'
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -435,7 +439,43 @@ const App = () => {
             </ProtectedRoute>
           }
         />
-        
+        {/* ---------------------all-affiliate------------------------- */}
+           <Route 
+          exact 
+          path="/affiliates/all-affiliates" 
+          element={
+            <ProtectedRoute>
+              <Allaffiliates />
+            </ProtectedRoute>
+          }
+        />
+               <Route 
+          exact 
+          path="/affiliates/payout" 
+          element={
+            <ProtectedRoute>
+              <Payout />
+            </ProtectedRoute>
+          }
+        />
+                 <Route 
+          exact 
+          path="/affiliates/set-affilaite-payout-amount" 
+          element={
+            <ProtectedRoute>
+              <Affiliatepayout />
+            </ProtectedRoute>
+          }
+        />
+                   <Route 
+          exact 
+          path="/affiliates/affilaite-details/:id" 
+          element={
+            <ProtectedRoute>
+              <Affilaitedetails />
+            </ProtectedRoute>
+          }
+        />
         {/* Catch all route - redirect to dashboard if authenticated, otherwise to login */}
         <Route 
           path="*" 
