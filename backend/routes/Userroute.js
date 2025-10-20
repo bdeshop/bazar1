@@ -555,8 +555,6 @@ Userrouter.post("/play-game", async (req, res) => {
       money: money,
       gameid: req.body.gameID,
     };
-<<<<<<< HEAD
-
     console.log("Sending POST request to joyhobe.com with data:", postData);
 
     // POST রিকোয়েস্ট
@@ -566,20 +564,10 @@ Userrouter.post("/play-game", async (req, res) => {
       {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
+          "x-dst-game": "f9d21d76de9f32f16d7e189bf0b729a7",
         },
       }
     );
-=======
-    console.log('Sending POST request to joyhobe.com with data:', postData);
-
-    // POST রিকোয়েস্ট
-    const response = await axios.post('https://dstplay.net/getgameurl', qs.stringify(postData), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'x-dst-game':"f9d21d76de9f32f16d7e189bf0b729a7"
-      },
-    });
->>>>>>> origin/main
 
     console.log(
       "Response from bajibet24.com:",
