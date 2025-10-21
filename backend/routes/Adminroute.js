@@ -10,7 +10,7 @@ const Terms = require("../models/Terms");
 const FAQ = require("../models/FAQ");
 const GameCategory = require("../models/GameCategory");
 const GameProvider = require("../models/GameProvider");
-// const {User} = require("../models/User");
+const {User} = require("../models/User");
 // Middleware to check if user is authenticated as admin
 const adminAuth = (req, res, next) => {
   // Implement your authentication logic here
@@ -143,6 +143,9 @@ Adminrouter.get("/dashboard", async (req, res) => {
 
     // Today's date filter
     const todayFilter = { createdAt: { $gte: today, $lt: tomorrow } };
+
+    console.log("this is user -> ",User)
+
 
     // 1. USER STATISTICS
     const totalUsers = await User.countDocuments();
@@ -2383,7 +2386,7 @@ Adminrouter.put("/game-providers/order/update", async (req, res) => {
 });
 
 const Game = require("../models/Game");
-const User = require("../models/User");
+// const User = require("../models/User");
 const Deposit = require("../models/Deposit");
 
 // Configure multer for game images
