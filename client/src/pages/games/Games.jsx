@@ -560,7 +560,7 @@ const Games = () => {
                     >
                       <div className="relative overflow-hidden">
                         <img
-                          src={`${base_url}${game.portraitImage}`}
+                          src={`${base_url}/${game.portraitImage}`}
                           alt={game.name}
                           className="w-full h-[150px] xs:h-[180px] sm:h-[200px] md:h-[220px] object-cover transition-transform duration-500 group-hover:scale-110"
                         />

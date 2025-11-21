@@ -134,7 +134,7 @@ export const Slider = memo(() => {
           <div key={slide.id} className="w-full flex-shrink-0">
             <img
               // src={`${base_url}${slide.src}`}
-              src={`${"https://api.1xwin.live/"}${slide.src}`}
+              src={`${base_url}/${slide.src}`}
               alt={slide.alt}
               className="w-full h-full object-cover"
               loading="lazy" // Add lazy loading for images

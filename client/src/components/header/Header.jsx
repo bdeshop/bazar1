@@ -662,7 +662,7 @@ export const Header = ({ sidebarOpen, setSidebarOpen }) => {
                     className="flex-shrink-0 w-48 bg-[#222424] overflow-hidden hover:bg-[#333] transition-colors duration-200"
                   >
                     <img
-                      src={`${API_BASE_URL}${promotion.image}`}
+                      src={`${API_BASE_URL}/${promotion.image}`}
                       alt={promotion.title}
                       className="w-full h-24 object-cover"
                     />

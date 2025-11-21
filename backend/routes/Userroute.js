@@ -1,5 +1,5 @@
 const express = require("express");
-const User = require("../models/User");
+const { User } = require("../models/User");
 const Userrouter = express.Router();
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
@@ -10,7 +10,7 @@ const axios = require("axios");
 
 const qs = require("qs");
 // JWT Secret Key
-const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret_key";
+const JWT_SECRET = process.env.JWT_SECRET || "fsdfsdfsd43534";
 // Authentication Middleware
 const authenticateToken = async (req, res, next) => {
   try {
@@ -544,56 +544,81 @@ Userrouter.put("/theme-preference", authenticateToken, async (req, res) => {
     });
   }
 });
+
+
 Userrouter.post("/play-game", async (req, res) => {
   try {
-    const { slug, username, money, userid } = req.body;
-    console.log(req.body);
-    const postData = {
-      home_url: "https://bajibet24.live",
-      token: "f9d21d76de9f32f16d7e189bf0b729a7",
-      username: username + "45",
-      money: money,
-      gameid: req.body.gameID,
-    };
-    console.log("Sending POST request to joyhobe.com with data:", postData);
+    const { slug, username, money, userid, gameID } = req.body;
 
-    // POST রিকোয়েস্ট
-    const response = await axios.post(
-      "https://dstplay.net/getgameurl",
-      qs.stringify(postData),
+    console.log("Incoming Request:", req.body);
+
+    // 1️⃣ FIRST: GET GAME DETAILS FROM ORACLE API
+    const gameDetails = await axios.get(
+      `https://apigames.oracleapi.net/api/games/${gameID}`,
       {
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "x-dst-game": "f9d21d76de9f32f16d7e189bf0b729a7",
+          "x-api-key": "f7709c7bd13372f79d71906ee3071d26fdb4338987eb731d8182dd743e0bb5ce",
         },
       }
     );
 
-    console.log(
-      "Response from bajibet24.com:",
-      response.data,
-      "Status:",
-      response.status
+    console.log("Game Details Response:", gameDetails.data);
+
+    // game_uuid extract
+    const gameUUID = gameDetails.data?.data?.game_uuid;
+
+    if (!gameUUID) {
+      return res.status(400).json({
+        error: "Game UUID not found!",
+      });
+    }
+
+    // 2️⃣ SECOND: PREPARE POST DATA FOR crazybet API
+    const postData = {
+      token: "a207109e5a3a98d4dc3f09d02ac78292",
+      username: username + "45",
+      money: money,
+      gameid: gameUUID, // 🔥 IMPORTANT: USE uuid HERE
+    };
+
+    console.log("Sending POST to crazybet99 with:", postData);
+
+    // 3️⃣ SEND POST REQUEST TO crazybet99
+    const response = await axios.post(
+      "https://crazybet99.com/getgameurl",
+      qs.stringify(postData),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "x-dstgame-key": "a207109e5a3a98d4dc3f09d02ac78292",
+        },
+      }
     );
-    res.status(200).json({
+
+    console.log("Response from crazybet99:", response.data);
+
+    // 4️⃣ FINAL RESPONSE
+  res.status(200).json({
       message: "POST request successful",
       joyhobeResponse: response.data,
     });
   } catch (error) {
-    console.error("Error in POST /api/test/game:", error);
+    console.error("Error in POST /play-game:", error);
+
     res.status(500).json({
-      error: "Failed to forward POST request",
-      details: error.message,
+      error: "Failed to process game request",
+      details: error.response?.data || error.message,
     });
   }
 });
+
 
 // Deposit route
 Userrouter.post("/deposit", authenticateToken, async (req, res) => {
   try {
     const { method, phoneNumber, amount, transactionId } = req.body;
     const userId = req.user._id;
-
+  console.log(req.body);
     // Validate input
     if (!method || !amount) {
       return res.status(400).json({
@@ -826,6 +851,9 @@ Userrouter.get(
   }
 );
 const Notification = require("../models/Notification"); // Add this at the top with other imports
+const BettingHistory = require("../models/BettingHistory");
+const Affiliate = require("../models/Affiliate");
+const MasterAffiliate = require("../models/MasterAffiliate");
 
 // -------- NOTIFICATION ROUTES --------
 
@@ -1157,60 +1185,72 @@ Userrouter.get("/all-transactions", authenticateToken, async (req, res) => {
 
 Userrouter.post("/getGameLink", async (req, res) => {
   try {
-    const { username, money, gameID } = req.body;
-    console.log(req.body);
-    // ?  for game baji
+    const { slug, username, money, userid, gameID } = req.body;
+
+    console.log("Incoming Request:", req.body);
+
+    // 1️⃣ FIRST: GET GAME DETAILS FROM ORACLE API
+    const gameDetails = await axios.get(
+      `https://apigames.oracleapi.net/api/games/${gameID}`,
+      {
+        headers: {
+          "x-api-key": "f7709c7bd13372f79d71906ee3071d26fdb4338987eb731d8182dd743e0bb5ce",
+        },
+      }
+    );
+
+    console.log("Game Details Response:", gameDetails.data);
+
+    // game_uuid extract
+    const gameUUID = gameDetails.data?.data?.game_uuid;
+
+    if (!gameUUID) {
+      return res.status(400).json({
+        error: "Game UUID not found!",
+      });
+    }
+
+    // 2️⃣ SECOND: PREPARE POST DATA FOR crazybet API
     const postData = {
-      home_url: "https://1xwin.live",
       token: "a207109e5a3a98d4dc3f09d02ac78292",
       username: username + "45",
       money: money,
-      gameid: req.body.gameID,
+      gameid: gameUUID, // 🔥 IMPORTANT: USE uuid HERE
     };
-    // ? for trickboy.xyz
-    // const postData = {
-    //   home_url: "https://trickboy.xyz",
-    //   token: "bf5891d45c356824ba6df15c9c15575d",
-    //   username: username + "45",
-    //   money: money,
-    //   gameid: req.body.gameID,
-    // };
 
-    // x-dstgame-key
-    // 'x-dstgame-key: yourlicensekey'
-    console.log("Sending POST request to joyhobe.com with data:", postData);
-    // POST রিভোয়েস্ট
+    console.log("Sending POST to crazybet99 with:", postData);
+
+    // 3️⃣ SEND POST REQUEST TO crazybet99
     const response = await axios.post(
-      "https://dstplay.net/getgameurl",
+      "https://crazybet99.com/getgameurl",
       qs.stringify(postData),
       {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          "x-dstgame-key": postData.token,
+          "x-dstgame-key": "a207109e5a3a98d4dc3f09d02ac78292",
         },
       }
     );
-    console.log(
-      "Response from dstplay.com:",
-      response.data,
-      "Status:",
-      response.status
-    );
-    res.status(200).json({
+
+    console.log("Response from crazybet99:", response.data);
+
+    // 4️⃣ FINAL RESPONSE
+  res.status(200).json({
       message: "POST request successful",
       joyhobeResponse: response.data,
     });
   } catch (error) {
-    console.error("Error in POST /api/test/game:", error);
+    console.error("Error in POST /play-game:", error);
+
     res.status(500).json({
-      error: "Failed to forward POST request",
-      details: error.message,
+      error: "Failed to process game request",
+      details: error.response?.data || error.message,
     });
   }
 });
 
 // Route to handle game callback data
-// POST http://localhost:4500/api/user/callback-data-game
+// Route to handle game callback data
 Userrouter.post("/callback-data-game", async (req, res) => {
   try {
     // Extract required fields from request body
@@ -1221,6 +1261,9 @@ Userrouter.post("/callback-data-game", async (req, res) => {
       game_uid,
       serial_number,
       currency_code,
+      platform = 'casino',
+      game_type,
+      device_info
     } = req.body;
 
     console.log(
@@ -1249,6 +1292,15 @@ Userrouter.post("/callback-data-game", async (req, res) => {
       });
     }
 
+    // Check if serial number already exists in BettingHistory
+    const existingBet = await BettingHistory.findOne({ serial_number });
+    if (existingBet) {
+      return res.status(409).json({
+        success: false,
+        message: "Duplicate transaction - serial number already exists.",
+      });
+    }
+
     // Trim member_account to maximum 45 characters
     if (member_account) {
       member_account = member_account.substring(0, 45);
@@ -1269,26 +1321,26 @@ Userrouter.post("/callback-data-game", async (req, res) => {
       });
     }
 
-    // Prepare the bet history record
+    // Calculate amounts
+    const betAmount = parseFloat(bet_amount) || 0;
+    const winAmount = parseFloat(win_amount) || 0;
+    const netAmount = winAmount - betAmount;
+    const isWin = winAmount > 0;
+    const status = isWin ? 'won' : 'lost';
+
+    // Calculate new balance
+    const balanceBefore = matchedUser.balance || 0;
+    const newBalance = balanceBefore - betAmount + winAmount;
+
+    // Prepare the bet history record for User model
     const betRecord = {
-      betAmount: parseFloat(bet_amount) || 0,
-      betResult: parseFloat(win_amount) > 0 ? "win" : "loss",
+      betAmount: betAmount,
+      betResult: isWin ? "win" : "loss",
       transaction_id: serial_number,
       game_id: game_uid,
       bet_time: new Date(),
-      status: parseFloat(win_amount) > 0 ? "completed" : "completed", // Assuming completed for processed bets
+      status: "completed",
     };
-
-    // Calculate new balance
-    const newBalance =
-      (matchedUser.balance || 0) -
-      (parseFloat(bet_amount) || 0) +
-      (parseFloat(win_amount) || 0);
-
-    // Update financial fields
-    const betAmount = parseFloat(bet_amount) || 0;
-    const winAmount = parseFloat(win_amount) || 0;
-    const isWin = winAmount > 0;
 
     // Update user data
     const updateResult = await User.findOneAndUpdate(
@@ -1310,7 +1362,7 @@ Userrouter.post("/callback-data-game", async (req, res) => {
           transactionHistory: {
             type: isWin ? "win" : "bet",
             amount: isWin ? winAmount : betAmount,
-            balanceBefore: matchedUser.balance,
+            balanceBefore: balanceBefore,
             balanceAfter: newBalance,
             description: isWin
               ? `Won ${winAmount} in game ${game_uid}`
@@ -1331,8 +1383,135 @@ Userrouter.post("/callback-data-game", async (req, res) => {
       });
     }
 
+    // Create BettingHistory record
+    const bettingHistoryRecord = new BettingHistory({
+      member_account: member_account,
+      original_username: originalusername,
+      user_id: matchedUser._id,
+      bet_amount: betAmount,
+      win_amount: winAmount,
+      net_amount: netAmount,
+      game_uid: game_uid,
+      serial_number: serial_number,
+      currency_code: currency_code,
+      status: status,
+      balance_before: balanceBefore,
+      balance_after: newBalance,
+      transaction_time: new Date(),
+      processed_at: new Date(),
+      platform: platform,
+      game_type: game_type,
+      device_info: device_info
+    });
+
+    // Save BettingHistory record
+    await bettingHistoryRecord.save();
+
     // Apply bet to wagering (for bonus requirements)
     await updateResult.applyBetToWagering(betAmount);
+
+    // ========== AFFILIATE COMMISSION LOGIC ==========
+    let affiliateCommissionProcessed = false;
+    let commissionDetails = null;
+
+    // Check if user has an affiliate code and process commission (only when user loses)
+    if (matchedUser.registrationSource?.affiliateCode && !isWin && betAmount > 0) {
+        try {
+            // Find master affiliate
+            const masterAffiliate = await MasterAffiliate.findOne({ 
+                masterCode: matchedUser.registrationSource.affiliateCode.toUpperCase(),
+                status: 'active'
+            });
+            
+            if (masterAffiliate) {
+                // Find super affiliate
+                const superAffiliate = await Affiliate.findOne({ 
+                    _id: masterAffiliate.createdBy,
+                    status: 'active'
+                });
+                
+                if (superAffiliate) {
+                    // Calculate commissions
+                    const superAffiliateCommission = (betAmount * superAffiliate.commissionRate) / 100;
+                    const masterAffiliateCommission = (superAffiliateCommission * masterAffiliate.commissionRate) / 100;
+
+                    console.log(`Commission Calculation - Bet: ${betAmount}, Super Rate: ${superAffiliate.commissionRate}%, Super Commission: ${superAffiliateCommission}, Master Rate: ${masterAffiliate.commissionRate}%, Master Commission: ${masterAffiliateCommission}`);
+
+                    // Update super affiliate earnings
+                    const superAffiliateEarning = await superAffiliate.addBetCommission(
+                        matchedUser._id,
+                        bettingHistoryRecord._id,
+                        betAmount,
+                        superAffiliate.commissionRate,
+                        superAffiliateCommission,
+                        `Bet commission from user ${originalusername} - Game: ${game_uid}`,
+                        {
+                            betType: 'loss',
+                            gameType: game_type,
+                            deviceInfo: device_info,
+                            masterAffiliateCode: masterAffiliate.masterCode
+                        }
+                    );
+
+                    // Update master affiliate earnings with override commission
+                    await masterAffiliate.addOverrideCommission(
+                        masterAffiliateCommission, // amount
+                        superAffiliate._id, // sourceAffiliate
+                        'bet_commission', // sourceType
+                        superAffiliateCommission, // sourceAmount
+                        masterAffiliate.commissionRate, // overrideRate
+                        `Override commission from super affiliate ${superAffiliate.affiliateCode} - User ${originalusername} bet loss in ${game_uid}`, // description
+                        {
+                            subAffiliateEarningId: superAffiliateEarning._id,
+                            notes: `Commission from user ${originalusername} bet loss - Bet ID: ${bettingHistoryRecord._id}, Bet Amount: ${betAmount}`
+                        }
+                    );
+
+                    // Refresh master affiliate data to get updated earnings
+                    const updatedMasterAffiliate = await MasterAffiliate.findById(masterAffiliate._id);
+
+                    affiliateCommissionProcessed = true;
+                    commissionDetails = {
+                        superAffiliate: {
+                            id: superAffiliate._id,
+                            code: superAffiliate.affiliateCode,
+                            commissionRate: superAffiliate.commissionRate,
+                            commissionAmount: superAffiliateCommission,
+                            newBalance: superAffiliate.totalEarnings + superAffiliateCommission
+                        },
+                        masterAffiliate: {
+                            id: updatedMasterAffiliate._id,
+                            code: updatedMasterAffiliate.masterCode,
+                            commissionRate: updatedMasterAffiliate.commissionRate,
+                            commissionAmount: masterAffiliateCommission,
+                            totalEarnings: updatedMasterAffiliate.masterEarnings.totalEarnings,
+                            pendingEarnings: updatedMasterAffiliate.masterEarnings.pendingEarnings,
+                            paidEarnings: updatedMasterAffiliate.masterEarnings.paidEarnings
+                        }
+                    };
+                    
+                    console.log(`✅ Affiliate commissions processed successfully`);
+                    console.log(`   - Super Affiliate: ${superAffiliateCommission} BDT`);
+                    console.log(`   - Master Affiliate: ${masterAffiliateCommission} BDT`);
+                    console.log(`   - Master Total Earnings: ${updatedMasterAffiliate.masterEarnings.totalEarnings} BDT`);
+                    console.log(`   - Master Pending Earnings: ${updatedMasterAffiliate.masterEarnings.pendingEarnings} BDT`);
+
+                } else {
+                    console.log(`❌ No active super affiliate found for master affiliate ${masterAffiliate.masterCode}`);
+                }
+            } else {
+                console.log(`❌ No active master affiliate found with code: ${matchedUser.registrationSource.affiliateCode}`);
+            }
+        } catch (error) {
+            console.error("❌ Error processing affiliate commission:", error);
+            // Don't fail the entire transaction if commission processing fails
+            affiliateCommissionProcessed = false;
+            commissionDetails = { error: error.message };
+        }
+    } else {
+        console.log(`ℹ️  No affiliate commission - User: ${isWin ? 'won' : 'lost'}, Bet: ${betAmount}, Affiliate Code: ${matchedUser.registrationSource?.affiliateCode || 'none'}`);
+    }
+    // ========== END AFFILIATE COMMISSION LOGIC ==========
 
     // Send success response
     res.json({
@@ -1344,12 +1523,23 @@ Userrouter.post("/callback-data-game", async (req, res) => {
         bet_amount,
         game_uid,
         serial_number,
-        gameRecordId:
-          updateResult.betHistory[updateResult.betHistory.length - 1]._id,
+        gameRecordId: updateResult.betHistory[updateResult.betHistory.length - 1]?._id,
+        bettingHistoryId: bettingHistoryRecord._id,
+        affiliateCommissionProcessed: affiliateCommissionProcessed,
+        commissionDetails: commissionDetails
       },
     });
   } catch (error) {
-    console.error("Error in callback-data:", error);
+    console.error("❌ Error in callback-data:", error);
+    
+    // Handle duplicate key error specifically
+    if (error.code === 11000 && error.keyPattern && error.keyPattern.serial_number) {
+      return res.status(409).json({
+        success: false,
+        message: "Duplicate transaction - serial number already exists.",
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Server error",
@@ -1357,5 +1547,10 @@ Userrouter.post("/callback-data-game", async (req, res) => {
     });
   }
 });
-
+// ----------------betting-records------------------------
+Userrouter.get("/betting-records/:userId", authenticateToken,async(req,res)=>{
+      const bettingrecords=await BettingHistory.find({user_id:req.params.userId}).sort({createdAt:-1});
+      res.status(200).json({success:true,data:bettingrecords});
+      
+})
 module.exports = Userrouter;

@@ -1,10 +1,10 @@
-import React, { useRef, useEffect, useState } from 'react';
-import axios from "axios"
+import React, { useRef, useEffect, useState } from "react";
+import axios from "axios";
 
 const Event = () => {
   const sliderRef = useRef(null);
   const base_url = import.meta.env.VITE_API_KEY_Base_URL;
-  
+
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,15 +16,15 @@ const Event = () => {
       try {
         setLoading(true);
         const response = await axios.get(`${base_url}/api/events`);
-        
+
         if (response.data.success) {
           setEvents(response.data.data);
         } else {
-          setError('Failed to fetch events');
+          setError("Failed to fetch events");
         }
       } catch (err) {
-        console.error('Error fetching events:', err);
-        setError('Error loading events');
+        console.error("Error fetching events:", err);
+        setError("Error loading events");
       } finally {
         setLoading(false);
       }
@@ -38,7 +38,7 @@ const Event = () => {
     if (sliderRef.current) {
       sliderRef.current.scrollBy({
         left: -200,
-        behavior: 'smooth'
+        behavior: "smooth",
       });
     }
   };
@@ -48,7 +48,7 @@ const Event = () => {
     if (sliderRef.current) {
       sliderRef.current.scrollBy({
         left: 200,
-        behavior: 'smooth'
+        behavior: "smooth",
       });
     }
   };
@@ -60,16 +60,16 @@ const Event = () => {
         const { scrollWidth, scrollLeft, clientWidth } = sliderRef.current;
         const maxScroll = scrollWidth - clientWidth;
         const currentScroll = scrollLeft;
-        
+
         if (currentScroll >= maxScroll) {
           sliderRef.current.scrollTo({
             left: 0,
-            behavior: 'smooth'
+            behavior: "smooth",
           });
         } else {
           sliderRef.current.scrollBy({
             left: 200,
-            behavior: 'smooth'
+            behavior: "smooth",
           });
         }
       }
@@ -80,15 +80,16 @@ const Event = () => {
 
   // Function to get full image URL
   const getImageUrl = (imagePath) => {
-    if (!imagePath) return "https://placehold.co/400x200/1a1a1a/ffffff?text=No+Image";
-    
+    if (!imagePath)
+      return "https://placehold.co/400x200/1a1a1a/ffffff?text=No+Image";
+
     // If it's already a full URL, return as is
-    if (imagePath.startsWith('http')) {
+    if (imagePath.startsWith("http")) {
       return imagePath;
     }
-    
+
     // Otherwise, construct the full URL using your base URL
-    return `${base_url}${imagePath}`;
+    return `${base_url}/${imagePath}`;
   };
 
   if (loading) {
@@ -164,14 +165,40 @@ const Event = () => {
               className="p-2 bg-box_bg hover:bg-box_bg/90 cursor-pointer rounded-[3px] transition-colors duration-200"
               aria-label="Scroll left"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-chevron-left"><path d="m15 18-6-6 6-6"/></svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="lucide lucide-chevron-left"
+              >
+                <path d="m15 18-6-6 6-6" />
+              </svg>
             </button>
             <button
               onClick={scrollRight}
               className="p-2 bg-box_bg hover:bg-box_bg/90 cursor-pointer rounded-[3px] transition-colors duration-200"
               aria-label="Scroll right"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-chevron-right"><path d="m9 18 6-6-6-6"/></svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="lucide lucide-chevron-right"
+              >
+                <path d="m9 18 6-6-6-6" />
+              </svg>
             </button>
           </div>
         </div>
